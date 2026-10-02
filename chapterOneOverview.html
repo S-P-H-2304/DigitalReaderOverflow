@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Capítulo 1: A la deriva</title>
+    <link rel="stylesheet" href="Styles/styles.css">
+</head>
+<body>
+    <header class="header">
+        <button type="button" class="add-publish" id="overlay-publish" aria-label="Volver atrás">
+            <svg class="close-overlay" viewBox="0 0 20 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0.439341 9.9853C-0.146446 10.5711 -0.146446 11.5208 0.43934 12.1066L9.98528 21.6526C10.5711 22.2383 11.5208 22.2383 12.1066 21.6526C12.6924 21.0668 12.6924 20.117 12.1066 19.5312L3.62132 11.046L12.1066 2.56068C12.6924 1.97489 12.6924 1.02514 12.1066 0.439357C11.5208 -0.14643 10.5711 -0.14643 9.98528 0.439357L0.439341 9.9853ZM19.5 11.046L19.5 9.54596L1.5 9.54596L1.5 11.046L1.5 12.546L19.5 12.546L19.5 11.046Z" fill="#D4DBE4"/>
+            </svg>
+        </button>
+    </header>
+    <main class="chapter-overview-container">
+        <section class="chapter-overview">
+            <article>
+                <img src="Images/cap1Cover.jpg" alt="Portada del capítulo 1" class="chapter-card-overview">
+            </article>
+            <div class="carousel-indicators" role="group" aria-label="Diapositivas del carrusel">
+                <button type="button" class="active-carousel-indicator" aria-current="true" aria-label="Portada del capítulo 1"></button>
+                <button type="button" class="carousel-indicator" aria-label="Reseñas del capítulo 1"></button>
+                <button type="button" class="carousel-indicator" aria-label="Créditos del capítulo 1"></button>
+            </div>
+        </section>
+        <div class="chapter-content">
+            <h1 class="chapter-title">Capítulo 1: A la deriva</h1>
+        </div>
+        <section class="chapter-info-start">
+            <div class="chapter-info">
+                <ul class="chapter-info-list">
+                    <li class="chapter-info-item">
+                        <svg class="chapter-info-icon" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M7.53906 0.852539C7.65091 0.38258 8.34909 0.382574 8.46094 0.852539L9.38184 4.72363C9.55048 5.43275 10.2195 5.90029 10.9404 5.83984L14.9834 5.50098C15.5146 5.45658 15.6673 6.10453 15.2725 6.33789L11.7988 8.3916C11.1722 8.762 10.9107 9.5342 11.2002 10.2061L12.7783 13.8682C12.8715 14.0846 12.7967 14.2807 12.623 14.4043C12.4476 14.529 12.2192 14.5426 12.0273 14.3799L8.95996 11.7783C8.40777 11.31 7.59222 11.31 7.04004 11.7783L3.97266 14.3799C3.78078 14.5426 3.55239 14.529 3.37695 14.4043C3.20325 14.2807 3.12847 14.0846 3.22168 13.8682L4.7998 10.2061C5.0893 9.5342 4.82782 8.762 4.20117 8.3916L0.727539 6.33789C0.332736 6.10454 0.48544 5.45658 1.0166 5.50098L5.05957 5.83984C5.78054 5.90029 6.44952 5.43275 6.61816 4.72363L7.53906 0.852539Z" fill="black" stroke="black"/>
+                        </svg>
+                        <span class="sr-only">Calificación: </span>
+                        <span class="js-rating">4.6</span>
+                    </li>
+                    <li class="chapter-info-item">
+                        <svg class="chapter-info-icon" viewBox="0 0 16 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M16 5.5C16 5.5 13 0 8 0C3 0 0 5.5 0 5.5C0 5.5 3 11 8 11C13 11 16 5.5 16 5.5ZM1.173 5.5C1.65578 4.76459 2.21197 4.08008 2.833 3.457C4.12 2.168 5.88 1 8 1C10.12 1 11.879 2.168 13.168 3.457C13.789 4.08008 14.3452 4.76459 14.828 5.5C14.7707 5.58667 14.7057 5.68267 14.633 5.788C14.298 6.268 13.803 6.908 13.168 7.543C11.879 8.832 10.119 10 8 10C5.881 10 4.121 8.832 2.832 7.543C2.21097 6.91992 1.65578 6.23541 1.173 5.5Z" fill="black"/>
+                            <path d="M8 3C7.33696 3 6.70107 3.26339 6.23223 3.73223C5.76339 4.20107 5.5 4.83696 5.5 5.5C5.5 6.16304 5.76339 6.79893 6.23223 7.26777C6.70107 7.73661 7.33696 8 8 8C8.66304 8 9.29893 7.73661 9.76777 7.26777C10.2366 6.79893 10.5 6.16304 10.5 5.5C10.5 4.83696 10.2366 4.20107 9.76777 3.73223C9.29893 3.26339 8.66304 3 8 3ZM4.5 5.5C4.5 4.57174 4.86875 3.6815 5.52513 3.02513C6.1815 2.36875 7.07174 2 8 2C8.92826 2 9.8185 2.36875 10.4749 3.02513C11.1313 3.6815 11.5 4.57174 11.5 5.5C11.5 6.42826 11.1313 7.3185 10.4749 7.97487C9.8185 8.63125 8.92826 9 8 9C7.07174 9 6.1815 8.63125 5.52513 7.97487C4.86875 7.3185 4.5 6.42826 4.5 5.5Z" fill="black"/>
+                        </svg>
+                        <span class="sr-only">Visualizaciones: </span>
+                        <span class="js-views">2.7k</span>
+                    </li>
+                    <li class="chapter-info-item">
+                        <span class="sr-only">Paneles leídos: </span>
+                        <span class="js-progress">0/35</span>
+                    </li>
+                </ul>
+            </div>
+            <div class="start-reading-container">
+                <a href="" class="cta-button">Empezar a leer</a>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
