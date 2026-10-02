@@ -172,6 +172,24 @@ a{
     margin-left: 1rem;
 }
 
+.publish-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: radial-gradient(73.22% 50% at 50% 50%, #7393AC 0%, var(--1, #2F3C46) 100%);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(100%); 
+        transition: transform 0.4s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.publish-overlay.active {
+    transform: translateY(0);
+}
+
 .add-publish-img {
     width: 1.5rem;
     height: 1.5rem;
