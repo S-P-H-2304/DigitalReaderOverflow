@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Overflow: Diarios de un pr√≥fugo</title>
     <link rel="stylesheet" href="Styles/styles.css">
+    <!-- Theme Loader -->
+    <script>
+        const savedChapter = localStorage.getItem('activeChapter');
+        if (savedChapter) document.documentElement.setAttribute('data-chapter', savedChapter);
+    </script>
 </head>
 <body>
    <header class="header">
@@ -14,20 +19,23 @@
    </header>
    <main class="reader-container">
         <div class="chapter-carousel">
-            <article class="chapter-card-prev">
-                <img src="Images/cap1Cover.jpg" alt="Cap√≠tulo anterior">
+            <article class="chapter-card-prev" data-chapter-id="4">
+                <img src="Images/cap4Cover.jpg" alt="CapÌtulo 4">
             </article>
 
-            <article class="chapter-card-active">
-                <img src="Images/cap1Cover.jpg" alt="Portada del cap√≠tulo actual" class="chapter-card-active-image">
-                
-                <button type="button" aria-label="Reproducir cap√≠tulo">
+            <article class="chapter-card-active" data-chapter-id="1">
+                <img src="Images/cap1Cover.jpg" alt="Portada del capÌtulo 1" class="chapter-card-active-image">
+                <button type="button" aria-label="Reproducir capÌtulo">
                     <img src="Images/play.png" alt="" aria-hidden="true">
                 </button>
             </article>
 
-            <article class="chapter-card-next">
-                <img src="Images/cap1Cover.jpg" alt="Siguiente cap√≠tulo">
+            <article class="chapter-card-next" data-chapter-id="2">
+                <img src="Images/cap2Cover.jpg" alt="CapÌtulo 2">
+            </article>
+
+            <article class="chapter-card-hidden" data-chapter-id="3">
+                <img src="Images/cap3Cover.jpg" alt="CapÌtulo 3">
             </article>
         </div>
         <nav class="bottom-nav" aria-label="Navegaci√≥n principal">
@@ -69,3 +77,5 @@
     <script src="Scripts/carrousel.js"></script>
 </body>
 </html>
+
+

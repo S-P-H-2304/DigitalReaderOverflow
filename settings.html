@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configuración</title>
     <link rel="stylesheet" href="Styles/styles.css">
+    <!-- Theme Loader -->
+    <script>
+        const savedChapter = localStorage.getItem('activeChapter');
+        if (savedChapter) document.documentElement.setAttribute('data-chapter', savedChapter);
+    </script>
 </head>
 <body>
     <header class="header">
@@ -82,3 +87,4 @@
     </main>
 </body>
 </html>
+

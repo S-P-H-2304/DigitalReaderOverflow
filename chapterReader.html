@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Capítulo 1: A la deriva</title>
     <link rel="stylesheet" href="Styles/styles.css">
+    <!-- Theme Loader -->
+    <script>
+        const savedChapter = localStorage.getItem('activeChapter');
+        if (savedChapter) document.documentElement.setAttribute('data-chapter', savedChapter);
+    </script>
 </head>
 <body>
     <header class="reader-header">
@@ -67,3 +72,4 @@
     <script src="Scripts/reader.js"></script>
 </body>
 </html>
+

@@ -21,62 +21,95 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.setAttribute('aria-label', 'Reproducir cap√≠tulo');
+            btn.setAttribute('aria-label', 'Reproducir capÌtulo');
             btn.innerHTML = '<img src="Images/play.png" alt="" aria-hidden="true">';
             activeCard.appendChild(btn);
         }
     }
 
-    // --- FUNCIONES PARA ROTAR CLASES ---
+    // --- ACTUALIZACION DEL TEMA ---
+    function updateTheme() {
+        const activeCard = carousel.querySelector('.chapter-card-active');
+        if (activeCard) {
+            const chapterId = activeCard.getAttribute('data-chapter-id');
+            if (chapterId && document.documentElement.getAttribute('data-chapter') !== chapterId) {
+                
+                // 1. Capturamos el fondo viejo antes del cambio
+                const oldBg = getComputedStyle(document.body).background;
+                
+                // 2. Creamos un elemento para el crossfade manual del fondo
+                const fader = document.createElement('div');
+                fader.style.position = 'fixed';
+                fader.style.top = '0';
+                fader.style.left = '0';
+                fader.style.width = '100vw';
+                fader.style.height = '100vh';
+                fader.style.background = oldBg;
+                fader.style.zIndex = '-1'; // Detr·s de todo
+                fader.style.pointerEvents = 'none';
+                fader.style.transition = 'opacity 0.6s ease';
+                document.body.appendChild(fader);
+                
+                // 3. Aplicamos el nuevo tema (el body cambiar· su fondo instant·neamente detr·s del fader)
+                document.documentElement.setAttribute('data-chapter', chapterId);
+                localStorage.setItem('activeChapter', chapterId);
+                
+                // 4. Hacemos que el fader desaparezca suavemente
+                // Forzamos reflow para que la transiciÛn funcione
+                fader.offsetHeight; 
+                fader.style.opacity = '0';
+                
+                // 5. Limpiamos el DOM una vez terminada la transiciÛn
+                setTimeout(() => {
+                    if(fader.parentNode) fader.remove();
+                }, 600);
+            }
+        }
+    }
+
     // --- FUNCIONES PARA ROTAR CLASES ---
     function moveCardsLeft() {
         const prev = carousel.querySelector('.chapter-card-prev');
         const active = carousel.querySelector('.chapter-card-active');
         const next = carousel.querySelector('.chapter-card-next');
+        const hidden = carousel.querySelector('.chapter-card-hidden');
 
-        // Las tarjetas visibles hacen su animaci√≥n normal
         if (active) active.className = 'chapter-card-prev'; 
         if (next) next.className = 'chapter-card-active'; 
-
-        // La tarjeta que da la vuelta (prev) se oculta
+        if (hidden) hidden.className = 'chapter-card-next';
+        
         if (prev) {
-            // 1. La volvemos invisible y le quitamos la transici√≥n
             prev.style.transition = 'none';
-            prev.style.opacity = '0';
-            prev.className = 'chapter-card-next'; 
-            
-            // 2. Esperamos exactamente 400ms (lo que dura tu CSS) para que reaparezca
+            prev.className = 'chapter-card-hidden';
             setTimeout(() => {
                 prev.style.transition = 'all 0.4s ease-in-out';
-                prev.style.opacity = ''; // Esto le devuelve el 0.6 dictado por tu CSS
-            }, 100);
+            }, 50);
         }
         
         updateExtraElements();
+        updateTheme();
     }
 
     function moveCardsRight() {
         const prev = carousel.querySelector('.chapter-card-prev');
         const active = carousel.querySelector('.chapter-card-active');
         const next = carousel.querySelector('.chapter-card-next');
+        const hidden = carousel.querySelector('.chapter-card-hidden');
 
         if (active) active.className = 'chapter-card-next'; 
         if (prev) prev.className = 'chapter-card-active'; 
+        if (hidden) hidden.className = 'chapter-card-prev';
 
         if (next) {
-            // Ocultamos la tarjeta que viaja (next)
             next.style.transition = 'none';
-            next.style.opacity = '0';
-            next.className = 'chapter-card-prev'; 
-            
-            // La mostramos de nuevo cuando la central termine de llegar
+            next.className = 'chapter-card-hidden';
             setTimeout(() => {
                 next.style.transition = 'all 0.4s ease-in-out';
-                next.style.opacity = ''; 
-            }, 100);
+            }, 50);
         }
         
         updateExtraElements();
+        updateTheme();
     }
 
     // --- CLICS EN TARJETAS ---
@@ -88,23 +121,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- L√ìGICA DEL ARRASTRE SINCRONIZADO (SCRUBBING) ---
+    // --- LOGICA DEL ARRASTRE SINCRONIZADO (SCRUBBING) ---
     let startX = 0;
     let isDragging = false;
     
-    // Calculamos el valor de 72vw en p√≠xeles para saber el l√≠mite de distancia
-    let gapPx = window.innerWidth * 0.72; 
+    // 75vw es lo que se usa en CSS (calc(-50% - 75vw)). 72vw era el valor en JS antes.
+    // Usaremos el valor que mejor empareje con el CSS.
+    let gapPx = window.innerWidth * 0.75; 
 
-    // Actualizamos el l√≠mite si rotan el celular
     window.addEventListener('resize', () => {
-        gapPx = window.innerWidth * 0.72;
+        gapPx = window.innerWidth * 0.75;
     });
 
     carousel.addEventListener('touchstart', (e) => {
         startX = e.touches[0].clientX;
         isDragging = true;
         
-        // Apagamos la transici√≥n de CSS para que el JS controle los fotogramas
         cards.forEach(card => {
             card.style.transition = 'none';
         });
@@ -115,23 +147,21 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let distance = e.touches[0].clientX - startX;
 
-        // 1. LIMITAR EL ARRASTRE: Evitamos que vaya m√°s all√° de la siguiente tarjeta
         if (distance > gapPx) distance = gapPx;
         if (distance < -gapPx) distance = -gapPx;
 
-        // 2. CALCULAR PROGRESO (de 0 a 1)
         const progress = Math.abs(distance / gapPx); 
 
         const active = carousel.querySelector('.chapter-card-active');
         const prev = carousel.querySelector('.chapter-card-prev');
         const next = carousel.querySelector('.chapter-card-next');
+        const hidden = carousel.querySelector('.chapter-card-hidden');
 
-        // 3. INTERPOLACI√ìN: Matem√°ticas para transformar escala y opacidad progresivamente
-        const activeScale = 1 - (0.12 * progress); // Se encoge de 1 a 0.88
-        const sideScale = 0.88 + (0.12 * progress); // Crece de 0.88 a 1
+        const activeScale = 1 - (0.12 * progress);
+        const sideScale = 0.88 + (0.12 * progress);
         
-        const activeOpacity = 1 - (0.4 * progress); // Se desvanece de 1 a 0.6
-        const sideOpacity = 0.6 + (0.4 * progress); // Se ilumina de 0.6 a 1
+        const activeOpacity = 1 - (0.4 * progress);
+        const sideOpacity = 0.6 + (0.4 * progress);
 
         if (active) {
             active.style.transform = `translate(calc(-50% + ${distance}px), -50%) scale(${activeScale})`;
@@ -139,23 +169,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (distance < 0) {
-            // Arrastrando a la izquierda (Acercando la tarjeta Next)
+            // Arrastrando izq
             if (next) {
                 next.style.transform = `translate(calc(-50% + ${gapPx + distance}px), -50%) scale(${sideScale})`;
                 next.style.opacity = sideOpacity;
             }
             if (prev) {
-                // La tarjeta previa solo se empuja hacia la izquierda
                 prev.style.transform = `translate(calc(-50% - ${gapPx}px + ${distance}px), -50%) scale(0.88)`;
             }
         } else {
-            // Arrastrando a la derecha (Acercando la tarjeta Prev)
+            // Arrastrando der
             if (prev) {
                 prev.style.transform = `translate(calc(-50% - ${gapPx - distance}px), -50%) scale(${sideScale})`;
                 prev.style.opacity = sideOpacity;
             }
             if (next) {
-                // La tarjeta siguiente solo se empuja hacia la derecha
                 next.style.transform = `translate(calc(-50% + ${gapPx}px + ${distance}px), -50%) scale(0.88)`;
             }
         }
@@ -167,23 +195,27 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const distance = e.changedTouches[0].clientX - startX;
 
-        // Limpiamos los estilos inyectados y reactivamos la animaci√≥n CSS
         cards.forEach(card => {
             card.style.transition = 'all 0.4s ease-in-out';
             card.style.transform = ''; 
             card.style.opacity = '';
         });
 
-        // Si arrastr√≥ m√°s del 30% del trayecto, confirmamos el cambio
         const threshold = gapPx * 0.3;
         
         if (distance < -threshold) {
             moveCardsLeft();
         } else if (distance > threshold) {
             moveCardsRight();
+        } else {
+            // Si no pasÛ el threshold, forzamos reflow para que vuelva a su lugar animado
+            updateExtraElements();
         }
     });
     
-    // Iniciar con todo en orden
+    // Iniciar
     updateExtraElements();
+    updateTheme();
 });
+
+
