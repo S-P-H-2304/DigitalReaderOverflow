@@ -5,11 +5,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cards.length === 0) return;
 
     // --- MANEJO DE ELEMENTOS EXTRA (PLAY Y CLASES) ---
+    // Guardamos UNA sola vez el boton original del HTML (con su SVG).
+    // En vez de destruirlo y recrearlo, solo lo movemos a la tarjeta activa,
+    // asi se conserva el SVG y cualquier listener que tenga.
+    const playButton = carousel.querySelector('.chapter-card-active button')
+        || carousel.querySelector('button');
+
     function updateExtraElements() {
         cards.forEach(card => {
-            const btn = card.querySelector('button');
-            if (btn) btn.remove();
-            
             const img = card.querySelector('img');
             if (img) img.classList.remove('chapter-card-active-image');
         });
@@ -19,11 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const img = activeCard.querySelector('img');
             if (img) img.classList.add('chapter-card-active-image');
 
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.setAttribute('aria-label', 'Reproducir capítulo');
-            btn.innerHTML = '<img src="Images/play.png" alt="" aria-hidden="true">';
-            activeCard.appendChild(btn);
+            // appendChild mueve el nodo existente (no lo duplica)
+            if (playButton && playButton.parentNode !== activeCard) {
+                activeCard.appendChild(playButton);
+            }
         }
     }
 

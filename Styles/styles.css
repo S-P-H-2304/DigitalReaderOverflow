@@ -190,7 +190,8 @@ a {
     backdrop-filter: blur(15px);
 }
 
-.chapter-card-active button img {
+.chapter-card-active button img,
+.chapter-card-active button svg {
     width: 1.5rem;
     height: 1.5rem;
     object-fit: contain;
