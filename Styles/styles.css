@@ -101,7 +101,12 @@ a {
 }
 
 .header-content {
-    padding: 1rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+    width: 100%;
+    margin-left: 1rem;
 }
 
 .novel-name {
@@ -195,11 +200,10 @@ a {
     backdrop-filter: blur(15px);
 }
 
-.chapter-card-active button img,
 .chapter-card-active button svg {
-    width: 1.5rem;
-    height: 1.5rem;
-    object-fit: contain;
+    width: 2rem;
+    height: 2rem;
+    padding-left: 0.25rem;
 }
 
 .bottom-nav {
@@ -298,6 +302,11 @@ a {
 .close-overlay {
     width: 2.5rem;
     height: 1rem;
+}
+
+.settings-overlay {
+    width: 2.5rem;
+    height: 1.3rem;
 }
 
 .bottom-nav-list a {
@@ -469,10 +478,12 @@ a {
     backdrop-filter: blur(15px);
 }
 
-#overlay-publish-container {
+.overlay-publish-container {
+    display: flex;
+    flex-direction: column;
     padding: 0;
     border: none;
-    border-radius: 0;
+    border-radius: 0;   
 }
 
 .community-card-cta {
@@ -492,14 +503,19 @@ a {
 }
 
 .community-card-cta-icon {
-    width: 1.5rem;
-    height: 1.3rem;
+    width: 1.8rem;
+    height: 1.5rem;
+}
+
+#cta-icon-gif {
+    width: 2.8rem;
+    height: 1.25rem;
 }
 
 .community-card-cta-icon-container {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 2rem;
 }
 
 .community-card-cta-container2 {
