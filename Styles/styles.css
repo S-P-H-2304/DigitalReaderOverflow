@@ -317,25 +317,16 @@ a {
 
 .chapter-card-overview {
     width: 100%;
-    height: auto;
+    height: auto; 
     border-radius: 2rem;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-
 }
 
 .carousel-indicators {
     display: flex;
     gap: 0.3rem;
     margin-top: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.active-carousel-indicator {
-    width: 2.5rem;
-    height: 0.4rem;
-    background-color: var(--accent-color);
-    border: none;
-    border-radius: 2rem;
+    margin-bottom: 1.2rem;
 }
 
 .carousel-indicator {
@@ -344,17 +335,40 @@ a {
     background-color: var(--accent-color);
     border: none;
     border-radius: 50%;
+    transition: width 0.3s ease, border-radius 0.3s ease; 
+}
+
+.carousel-indicator.active-carousel-indicator {
+    width: 2.5rem;
+    border-radius: 2rem;
+}
+
+.slides-container {
+    display: grid;
+    width: 100%;
+}
+
+.chapter-slide {
+    grid-area: 1 / 1; 
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+.chapter-slide.active-slide {
+    opacity: 1;
+    visibility: visible;
 }
 
 .chapter-content {
     width: 13.5rem;
     display: flex;
     flex-direction: column;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
 }
 
 .chapter-title {
-    font-size: 2.5rem;
+    font-size: 2.25rem;
     font-weight: bold;
     color: var(--text-primary);
     overflow-wrap: break-word;
@@ -908,8 +922,85 @@ a {
 
 .body-reader {
     overflow: hidden;
-    /* Evita dobles barras de scroll molestas */
 }
+
+.confirm-overlay-container {
+    background-color: #2F3C468C; 
+    border-top: var(--glass-border-top);
+    border-left: var(--glass-border-left);
+    border-bottom: var(--glass-border-bottom);
+    border-right: var(--glass-border-right);
+    box-shadow: var(--glass-glow), 0 4px 12px rgba(0, 0, 0, 0.1);
+    height: auto;
+    width: calc(100% - 5rem); 
+    max-width: 400px;
+    padding: 3.5rem 2.5rem;
+    border-radius: 2rem;
+    transform: scale(0.8);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.confirm-overlay-content{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 3rem;
+}
+
+.confirm-overlay-content h2{
+    font-size: 1.4rem;
+}
+
+.confirm-overlay-selection{
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    width: 100%;
+    font-size: 1.25rem;
+    padding: 0.625rem 0rem;
+}
+
+.confirm-overlay-close{
+    display: flex;
+    border-radius: 2rem;
+    padding: 0.5rem 1rem;
+    border-top: var(--glass-border-top);
+    border-left: var(--glass-border-left);
+    border-bottom: var(--glass-border-bottom);
+    border-right: var(--glass-border-right);
+    box-shadow: var(--glass-glow), 0 4px 12px rgba(0, 0, 0, 0.1);
+    -webkit-backdrop-filter: blur(15px);
+    backdrop-filter: blur(15px);
+}
+
+.confirm-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.4); 
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.confirm-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.confirm-backdrop.active .confirm-overlay-container {
+    transform: scale(1) translateZ(0);
+}
+
 
 
 

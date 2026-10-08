@@ -23,11 +23,19 @@
     </header>
     <main class="chapter-overview-container">
         <section class="chapter-overview">
-            <article>
-                <img src="Images/cap1Cover.jpg" alt="Portada del capítulo 1" class="chapter-card-overview">
-            </article>
+            <div class="slides-container">
+                <article class="chapter-slide active-slide">
+                    <img src="Images/cap1Cover.jpg" alt="Portada del capítulo 1" class="chapter-card-overview">
+                </article>
+                <article class="chapter-slide">
+                    <p>Lorem Ipsum Dolor Amet</p>
+                </article>
+                <article class="chapter-slide">
+                    <p>Lorem Ipsum Dolor Amet</p>
+                </article>
+            </div>
             <div class="carousel-indicators" role="group" aria-label="Diapositivas del carrusel">
-                <button type="button" class="active-carousel-indicator" aria-current="true" aria-label="Portada del capítulo 1"></button>
+                <button type="button" class="carousel-indicator active-carousel-indicator" aria-current="true" aria-label="Portada del capítulo 1"></button>
                 <button type="button" class="carousel-indicator" aria-label="Reseñas del capítulo 1"></button>
                 <button type="button" class="carousel-indicator" aria-label="Créditos del capítulo 1"></button>
             </div>
@@ -64,6 +72,7 @@
             </div>
         </section>
     </main>
+    <script src="Scripts/overview-carrousel.JS"></script>
 </body>
 </html>
 

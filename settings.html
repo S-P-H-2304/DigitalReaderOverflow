@@ -76,6 +76,21 @@
                     </label>
                 </div>
         </article>
+        <div class="confirm-backdrop" id="logout-backdrop">
+            <article class="confirm-overlay-container">
+                <div class="confirm-overlay-content">
+                    <h2>¿Estás seguro de que quieres cerrar sesión?</h2>
+                    <div class="confirm-overlay-selection">
+                        <div id="btn-cancelar" style="cursor: pointer;">
+                            <span>Cancelar</span>
+                        </div>
+                        <div class="confirm-overlay-close" id="btn-confirmar-logout" style="cursor: pointer;">
+                            <span>Cerrar sesión</span>
+                        </div>
+                    </div>
+                </div>
+            </article>
+        </div>
         <footer>
             <div class="settings-icon-container" id="settings-padding">
                 <h3>Cerrar Sesión</h3>
@@ -85,6 +100,7 @@
             </div>
         </footer>
     </main>
+    <script src="Scripts/log-out.js"></script>
 </body>
 </html>
 
