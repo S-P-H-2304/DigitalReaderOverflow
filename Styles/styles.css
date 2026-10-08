@@ -15,6 +15,7 @@ body {
     --primary-color: #191919;
     --text-primary: #FFFFFF;
     --text-secondary: #D4DBE4;
+    --on-surface: #D4DBE4;
     --accent-color: #728CA6;
     --nav-bg: rgba(114, 140, 166, 0.12);
     --card-bg: rgba(197, 205, 216, 0.25);
@@ -40,6 +41,7 @@ body {
     --tab-container-bg: #2A333D;
     --bg-gradient: radial-gradient(circle at 50% 50%, #7393AC 0%, #2F3C46 100%);
     --text-secondary: #D4DBE4;
+    --on-surface: #D4DBE4;
     --accent-color: #728CA6;
     --card-bg: rgba(197, 205, 216, 0.25);
     --button-bg: rgba(114, 140, 166, 0.45);
@@ -50,6 +52,7 @@ body {
 :root[data-chapter="2"] {
     --bg-gradient: radial-gradient(circle at 50% 50%, #1B5AA0 0%, #081742 100%);
     --text-secondary: #D5A260;
+    --on-surface: #D8D0C0;
     --accent-color: #D5A260;
     --card-bg: rgba(213, 162, 96, 0.25);
     --button-bg: rgba(213, 162, 96, 0.45);
@@ -62,6 +65,7 @@ body {
 :root[data-chapter="3"] {
     --bg-gradient: radial-gradient(circle at 50% 50%, #4070B8 0%, #353A4D 100%);
     --text-secondary: #AED5F6;
+    --on-surface: #B0C8E0;
     --accent-color: #50ACE5;
     --card-bg: rgba(88, 133, 192, 0.25);
     --button-bg: rgba(88, 133, 192, 0.45);
@@ -74,6 +78,7 @@ body {
 :root[data-chapter="4"] {
     --bg-gradient: radial-gradient(circle at 50% 50%, #3A6890 0%, #132435 100%);
     --text-secondary: #E9F0F8;
+    --on-surface: #D0D8E8;
     --accent-color: #8B0333;
     --card-bg: rgba(90, 24, 40, 0.25);
     --button-bg: rgba(90, 24, 40, 0.45);
@@ -542,11 +547,23 @@ a {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    color: var(--on-surface); /* icono + contador siguen la paleta */
 }
 
 .interaction-icon {
     width: 1.1rem;
     height: 1.1rem;
+}
+
+/* El icono hereda el color del contenedor (currentColor).
+   Solo se pinta la propiedad que el SVG ya usa: si es de contorno cambia
+   el stroke, si es relleno cambia el fill. fill="none"/stroke="none" se respetan. */
+.interaction-icon [stroke]:not([stroke="none"]) {
+    stroke: currentColor;
+}
+
+.interaction-icon [fill]:not([fill="none"]) {
+    fill: currentColor;
 }
 
 #gap-container {
