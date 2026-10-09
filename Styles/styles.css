@@ -28,6 +28,7 @@ body {
     --glass-border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     --glass-border-right: 1px solid rgba(255, 255, 255, 0.05);
     --glass-glow: inset 0 1px 1px rgba(255, 255, 255, 0.3);
+    --border-radius: 100rem;
     font-size: 16px;
 }
 
@@ -42,7 +43,7 @@ body {
     --bg-gradient: radial-gradient(circle at 50% 50%, #7393AC 0%, #2F3C46 100%);
     --text-secondary: #D4DBE4;
     --on-surface: #D4DBE4;
-    --accent-color: #728CA6;
+    --accent-color: #6391be;
     --card-bg: rgba(197, 205, 216, 0.25);
     --button-bg: rgba(114, 140, 166, 0.45);
     --danger-color: #C44848;
@@ -238,6 +239,7 @@ a {
 .bottom-nav-list-img {
     width: 2rem;
     height: 2rem;
+    color: var(--text-secondary);
 }
 
 .add-publish {
@@ -270,7 +272,6 @@ a {
     border-left: var(--glass-border-left);
     border-bottom: var(--glass-border-bottom);
     border-right: var(--glass-border-right);
-    margin-left: 1rem;
     box-shadow: var(--glass-glow), 0 4px 12px rgba(0, 0, 0, 0.2);
     -webkit-backdrop-filter: blur(15px);
     backdrop-filter: blur(15px);
@@ -533,8 +534,8 @@ a {
 
 .community-card-cta-publish {
     font-size: 1rem;
-    padding: 0.3rem 0.7rem;
-    border-radius: 1rem;
+    padding: 0.7rem 1.8rem;
+    border-radius: var(--border-radius);
     border-color: var(--border-color);
     border: 1px solid;
     background-color: var(--button-bg);
@@ -548,6 +549,7 @@ a {
 }
 
 .community-card-profile-icon {
+    color: var(--on-surface);
     width: 3rem;
     height: 3rem;
 }
@@ -567,9 +569,9 @@ a {
 }
 
 .dot {
-    width: 0.25rem;
-    height: 0.25rem;
-    background-color: #333;
+    width: 0.15rem;
+    height: 0.15rem;
+    background-color: var(--on-surface);
     border-radius: 50%;
 }
 
@@ -693,6 +695,7 @@ a {
 
 .span-title {
     font-weight: bolder;
+    font-size: 1.25rem;
 }
 
 .posts-reposts-container {
@@ -738,7 +741,7 @@ a {
     z-index: 2;
     background-color: transparent;
     border: none;
-    color: var(--text-secondary);
+    color: var(--on-surface);
     font-size: 1rem;
     font-weight: bold;
     transition: color 0.3s ease;
@@ -802,6 +805,17 @@ a {
 .settings-panels-content {
     display: flex;
     justify-content: space-between;
+    align-items: center;
+}
+
+.settings-panels-content h2 {
+    font-size: 1.2rem;
+    color: var(--text-primary);
+}
+
+.settings-panels-content p {
+    font-size: 0.9rem;
+    color: var(--on-surface);
 }
 
 .settings-icon-container {
@@ -839,9 +853,9 @@ a {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #1561e6;
+    background-color: var(--button-bg);
     border-radius: 2rem;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: var(--glass-border-top);
     transition: background-color 0.4s ease;
 }
 
@@ -852,13 +866,13 @@ a {
     width: 1.4rem;
     left: 0.2rem;
     bottom: 0.15rem;
-    background-color: #e2e8f0;
+    background-color: var(--text-primary);
     border-radius: 50%;
     transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .toggle-input:checked+.toggle-slider {
-    background-color: #6b8296;
+    background-color: var(--accent-color);
 }
 
 .toggle-input:checked+.toggle-slider::before {
@@ -904,9 +918,8 @@ a {
     width: fit-content;
     height: 2.5rem;
     border-radius: 2rem;
-    margin-right: 1rem;
     padding: 0.5rem;
-    gap: 2rem;
+    gap: 1rem;
     border-top: var(--glass-border-top);
     border-left: var(--glass-border-left);
     border-bottom: var(--glass-border-bottom);
@@ -918,8 +931,6 @@ a {
 
 #likes-interaction {
     gap: 0rem;
-    margin-left: 1rem;
-    margin-right: 0;
 }
 
 .header-interactions span {
