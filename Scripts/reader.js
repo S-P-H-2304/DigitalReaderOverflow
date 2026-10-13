@@ -7,19 +7,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // Validación de seguridad
     if (!visor || !btnPrev || !btnNext) return;
 
-    // 2. Acción para bajar de página
+    // Desplazamiento proporcional fluido (tira vertical)
+    const getScrollStep = () => Math.round(window.innerHeight * 0.75);
+
+    // 2. Acción para bajar en la tira
     btnNext.addEventListener('click', () => {
         visor.scrollBy({
-            top: window.innerHeight, // Baja exactamente 1 pantalla de alto
+            top: getScrollStep(),
             left: 0,
-            behavior: 'smooth'       // Movimiento fluido y animado
+            behavior: 'smooth'
         });
     });
 
-    // 3. Acción para subir de página
+    // 3. Acción para subir en la tira
     btnPrev.addEventListener('click', () => {
         visor.scrollBy({
-            top: -window.innerHeight, // El número negativo lo hace subir 1 pantalla
+            top: -getScrollStep(),
             left: 0,
             behavior: 'smooth'
         });

@@ -1,8 +1,20 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const btnVolver = document.getElementById('overlay-publish');
     const btnCerrarSesion = document.getElementById('settings-padding'); // Botón del footer
     const backdrop = document.getElementById('logout-backdrop'); // El fondo oscuro
     const btnCancelar = document.getElementById('btn-cancelar'); // Botón cancelar
     const btnConfirmar = document.getElementById('btn-confirmar-logout'); // Botón confirmar
+
+    // 0. BOTÓN VOLVER ATRÁS
+    if (btnVolver) {
+        btnVolver.addEventListener('click', () => {
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
+    }
 
     // 1. ABRIR EL POPUP
     btnCerrarSesion.addEventListener('click', () => {

@@ -10,7 +10,7 @@ body {
 }
 
 :root {
-    /* Variables Cap�tulo 1 (Lector Palette 1) */
+    /* Variables Capítulo 1 (Lector Palette 1) */
     --bg-gradient: radial-gradient(circle at 50% 50%, #7393AC 0%, #2F3C46 100%);
     --primary-color: #191919;
     --text-primary: #FFFFFF;
@@ -33,10 +33,10 @@ body {
 }
 
 /* =========================================
-   VARIACIONES DE TEMA POR CAP�TULO
+   VARIACIONES DE TEMA POR CAPÍTULO
 ========================================= */
 
-/* Paleta Cap�tulo 1 (Lector Palette 1) */
+/* Paleta Capítulo 1 (Lector Palette 1) */
 :root[data-chapter="1"] {
     --nav-bg: rgba(114, 140, 166, 0.12);
     --tab-container-bg: #2A333D;
@@ -49,7 +49,7 @@ body {
     --danger-color: #C44848;
 }
 
-/* Paleta Cap�tulo 2 (Lector Palette 2) */
+/* Paleta Capítulo 2 (Lector Palette 2) */
 :root[data-chapter="2"] {
     --bg-gradient: radial-gradient(circle at 50% 50%, #1B5AA0 0%, #081742 100%);
     --text-secondary: #D5A260;
@@ -62,7 +62,7 @@ body {
     --tab-container-bg: #081742;
 }
 
-/* Paleta Cap�tulo 3 (Lector Palette 3) */
+/* Paleta Capítulo 3 (Lector Palette 3) */
 :root[data-chapter="3"] {
     --bg-gradient: radial-gradient(circle at 50% 50%, #4070B8 0%, #353A4D 100%);
     --text-secondary: #AED5F6;
@@ -75,7 +75,7 @@ body {
     --tab-container-bg: #353A4D;
 }
 
-/* Paleta Cap�tulo 4 (Lector Palette 4) */
+/* Paleta Capítulo 4 (Lector Palette 4) */
 :root[data-chapter="4"] {
     --bg-gradient: radial-gradient(circle at 50% 50%, #3A6890 0%, #132435 100%);
     --text-secondary: #E9F0F8;
@@ -951,10 +951,10 @@ a {
 .reader-viewport {
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     overflow-y: auto;
     overflow-x: hidden;
     scroll-behavior: smooth;
-    scroll-snap-type: y mandatory;
     background-color: #121212;
 }
 
@@ -964,17 +964,17 @@ a {
 
 .page-container {
     width: 100%;
-    height: 100vh;
+    height: auto;
     display: flex;
     justify-content: center;
     align-items: center;
-    scroll-snap-align: start;
 }
 
 .page-image {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
+    height: auto;
+    display: block;
+    object-fit: contain;
 }
 
 .body-reader {

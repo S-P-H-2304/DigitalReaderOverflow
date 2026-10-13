@@ -1,4 +1,24 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // 0. Botón Volver / Salir de perfil
+    const btnVolver = document.getElementById('overlay-publish');
+    if (btnVolver) {
+        btnVolver.addEventListener('click', () => {
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
+    }
+
+    // Botón Editar perfil -> Navegar a settings
+    const btnEditProfile = document.getElementById('edit-profile');
+    if (btnEditProfile) {
+        btnEditProfile.addEventListener('click', () => {
+            window.location.href = 'settings.html';
+        });
+    }
+
     const btnPosts = document.querySelector('.posts');
     const btnReposts = document.querySelector('.reposts');
     const activePill = document.querySelector('.active-pill');
