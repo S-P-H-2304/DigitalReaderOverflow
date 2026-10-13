@@ -136,8 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 fader.style.left = '0';
 
                 fader.style.width = '100vw';
-
-                fader.style.height = '100vh';
+                fader.style.height = '100dvh';
 
                 fader.style.background = oldBg;
 

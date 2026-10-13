@@ -2,14 +2,23 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    -webkit-tap-highlight-color: transparent;
 }
 
 body {
     background: var(--bg-gradient);
     color: var(--text-primary);
+    min-height: 100vh;
+    min-height: 100dvh;
 }
 
 :root {
+    /* Zonas seguras para dispositivos móviles (Notch, Home Indicator) */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+
     /* Variables Capítulo 1 (Lector Palette 1) */
     --bg-gradient: radial-gradient(circle at 50% 50%, #7393AC 0%, #2F3C46 100%);
     --primary-color: #191919;
@@ -112,7 +121,7 @@ a {
 
 .header {
     display: flex;
-    padding: 1.5rem 1rem;
+    padding: calc(1.2rem + var(--safe-top)) 1rem 1.2rem;
     margin-bottom: -1.4rem;
     justify-content: space-between;
     align-items: center;
@@ -145,6 +154,10 @@ a {
     position: relative;
     width: 100%;
     height: 70vh;
+    height: 70dvh;
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .chapter-carousel article {
@@ -161,6 +174,7 @@ a {
 .chapter-card-active {
     width: 100%;
     height: 70vh;
+    height: 70dvh;
     transform: translate(-50%, -50%) scale(1);
     z-index: 2;
     opacity: 1;
@@ -169,6 +183,7 @@ a {
 .chapter-card-prev {
     width: 68vw;
     height: 55vh;
+    height: 55dvh;
     transform: translate(calc(-50% - 75vw), -50%) scale(0.88);
     z-index: 1;
     opacity: 0.6;
@@ -177,6 +192,7 @@ a {
 .chapter-card-next {
     width: 68vw;
     height: 55vh;
+    height: 55dvh;
     transform: translate(calc(-50% + 75vw), -50%) scale(0.88);
     z-index: 1;
     opacity: 0.6;
@@ -185,6 +201,7 @@ a {
 .chapter-card-hidden {
     width: 68vw;
     height: 55vh;
+    height: 55dvh;
     transform: translate(-50%, -50%) scale(0.7);
     z-index: 0;
     opacity: 0;
@@ -195,6 +212,10 @@ a {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
+    pointer-events: none;
 }
 
 .chapter-card-active button {
@@ -229,7 +250,7 @@ a {
     align-items: center;
     gap: 0.8rem;
     position: fixed;
-    bottom: 2.5rem;
+    bottom: calc(1.5rem + var(--safe-bottom));
     left: 50%;
     transform: translateX(-50%);
     z-index: 100;
@@ -302,10 +323,14 @@ a {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: radial-gradient(73.22% 50% at 50% 50%, #7393AC 0%, var(--1, #2F3C46) 100%);
+    height: 100dvh;
+    min-height: -webkit-fill-available;
+    background: var(--bg-gradient);
     z-index: 9999;
     display: flex;
     flex-direction: column;
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
     transform: translateY(100%);
     transition: transform 0.4s cubic-bezier(0.33, 1, 0.68, 1);
 }
@@ -427,7 +452,8 @@ a {
 }
 
 .chapter-content {
-    width: 13.5rem;
+    width: 100%;
+    max-width: 22rem;
     display: flex;
     flex-direction: column;
     margin-bottom: 1.5rem;
@@ -985,7 +1011,7 @@ a {
 
 .reader-header {
     display: flex;
-    padding: 1.5rem 1rem;
+    padding: calc(1.2rem + var(--safe-top)) 1rem 1.2rem;
     justify-content: space-between;
     align-items: center;
     background: linear-gradient(to bottom, rgb(0, 0, 0), #007aff00);
@@ -1003,6 +1029,7 @@ a {
     left: 0;
     width: 100%;
     z-index: 100;
+    padding: 1.2rem 1rem calc(1.2rem + var(--safe-bottom));
 }
 
 .header-interactions {
@@ -1076,7 +1103,7 @@ a {
 }
 
 .confirm-overlay-container {
-    background-color: #2F3C468C; 
+    background-color: var(--card-bg); 
     border-top: var(--glass-border-top);
     border-left: var(--glass-border-left);
     border-bottom: var(--glass-border-bottom);
@@ -1131,6 +1158,8 @@ a {
     left: 0;
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
+    min-height: -webkit-fill-available;
     background-color: rgba(0, 0, 0, 0.4); 
     z-index: 9999;
     display: flex;
@@ -1140,6 +1169,7 @@ a {
     backdrop-filter: blur(8px);
     opacity: 0;
     visibility: hidden;
+    padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
     transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
@@ -1340,7 +1370,8 @@ a {
 .comments-modal-sheet {
     width: 100%;
     max-width: 480px;
-    max-height: 80vh;
+    max-height: 85vh;
+    max-height: 85dvh;
     background: var(--card-bg, #1a1a24);
     border-top-left-radius: 1.5rem;
     border-top-right-radius: 1.5rem;
@@ -1350,11 +1381,12 @@ a {
     box-shadow: var(--glass-glow), 0 -8px 24px rgba(0, 0, 0, 0.3);
     display: flex;
     flex-direction: column;
-    padding: 1.2rem 1.4rem;
+    padding: 1.2rem 1.4rem calc(1.2rem + var(--safe-bottom));
     transform: translateY(100%);
     transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
+    overscroll-behavior-y: contain;
 }
 
 .comments-modal-backdrop.active .comments-modal-sheet {
@@ -1394,6 +1426,8 @@ a {
     gap: 0.9rem;
     min-height: 120px;
     max-height: 48vh;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
 .empty-comments-box {
@@ -1465,7 +1499,7 @@ a {
     padding: 0.6rem 1rem;
     color: var(--text-primary);
     font-family: inherit;
-    font-size: 0.9rem;
+    font-size: 1rem;
     outline: none;
     border-top: var(--glass-border-top);
     border-left: var(--glass-border-left);
