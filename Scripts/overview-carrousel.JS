@@ -63,4 +63,9 @@ document.addEventListener('DOMContentLoaded', () => {
             cambiarTarjeta(indiceActual - 1);
         }
     }
+
+    // Animación de entrada fluida para Overview
+    if (window.Motion) {
+        window.Motion.animateOverviewEntrance();
+    }
 });

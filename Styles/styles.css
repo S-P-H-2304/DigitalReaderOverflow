@@ -19,6 +19,12 @@ body {
     --safe-left: env(safe-area-inset-left, 0px);
     --safe-right: env(safe-area-inset-right, 0px);
 
+    /* Curvas de Aceleración y Resortes Mobile-First */
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    --ease-smooth: cubic-bezier(0.25, 1, 0.5, 1);
+    --ease-out-back: cubic-bezier(0.34, 1.3, 0.64, 1);
+
     /* Variables Capítulo 1 (Lector Palette 1) */
     --bg-gradient: radial-gradient(circle at 50% 50%, #7393AC 0%, #2F3C46 100%);
     --primary-color: #191919;
@@ -44,6 +50,10 @@ body {
     --like-color: #2ed573;                /* Verde positivo para Like / Me gusta */
     --dislike-color: var(--danger-color); /* Rojo peligro/negativo para Dislike */
     --repost-color: #38bdf8;              /* Cyan / Azul vibrante para Repost */
+}
+
+@view-transition {
+    navigation: auto;
 }
 
 /* =========================================
@@ -248,12 +258,53 @@ a {
 .bottom-nav {
     display: flex;
     align-items: center;
-    gap: 0.8rem;
+    gap: 0;
     position: fixed;
     bottom: calc(1.5rem + var(--safe-bottom));
     left: 50%;
     transform: translateX(-50%);
     z-index: 100;
+    transition: transform 0.35s var(--ease-spring), gap 0.35s var(--ease-spring);
+}
+
+.bottom-nav.is-community {
+    gap: 0.8rem;
+}
+
+.bottom-nav.is-leaving {
+    gap: 0;
+    transition: transform 0.2s ease, gap 0.2s ease;
+}
+
+.bottom-nav-action-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 0;
+    opacity: 0;
+    transform: scale(0) translateX(-15px);
+    overflow: hidden;
+    pointer-events: none;
+    transition: width 0.35s var(--ease-spring),
+                opacity 0.25s ease,
+                transform 0.35s var(--ease-spring);
+    flex-shrink: 0;
+}
+
+.bottom-nav.is-community .bottom-nav-action-wrapper {
+    width: 3.5rem;
+    opacity: 1;
+    transform: scale(1) translateX(0);
+    overflow: visible;
+    pointer-events: auto;
+}
+
+.bottom-nav.is-leaving .bottom-nav-action-wrapper {
+    width: 0;
+    opacity: 0;
+    transform: scale(0) translateX(-10px);
+    pointer-events: none;
+    transition: width 0.2s ease, opacity 0.15s ease, transform 0.2s ease;
 }
 
 .bottom-nav-list {
@@ -1532,7 +1583,7 @@ a {
 .photo-editable {
     cursor: pointer;
     position: relative;
-    transition: opacity 0.2s ease, filter 0.2s ease;
+    transition: transform 0.25s var(--ease-spring), opacity 0.2s ease, filter 0.2s ease;
 }
 
 .photo-editable:hover {
@@ -1540,12 +1591,292 @@ a {
 }
 
 .photo-editable:active {
-    opacity: 0.8;
+    transform: scale(0.96) translateZ(0);
+    opacity: 0.85;
 }
 
 /* Indicador de seguidor activo */
 .follow-state.active-following {
     background-color: rgba(255, 255, 255, 0.15);
     border-color: var(--accent-color, #ffffff);
+}
+
+/* ========================================================
+   SISTEMA MAESTRO DE MICRO-INTERACCIONES TÁCTILES MOBILE-FIRST
+   Optimizado para GPU (transform/opacity) a 60–120 FPS
+======================================================== */
+
+/* Touch manipulation para eliminar el retardo de 300ms en navegadores móviles */
+button,
+a,
+.action-btn,
+.btn-publish-action,
+.community-card-cta-publish,
+.cta-button,
+.reader-icons-interactions,
+.photo-editable,
+.settings-panels-content[data-field],
+.toggle-slider {
+    touch-action: manipulation;
+}
+
+/* 1. Botones de acción circular (.add-publish, #overlay-publish, #edit-profile) */
+.add-publish,
+#overlay-publish,
+#edit-profile {
+    cursor: pointer;
+    transition: transform 0.2s var(--ease-spring), box-shadow 0.2s ease, filter 0.2s ease, background-color 0.3s ease;
+}
+
+.add-publish:active,
+#overlay-publish:active,
+#edit-profile:active {
+    transform: scale(0.9) translateZ(0);
+    filter: brightness(1.15);
+}
+
+#overlay-publish:active .close-overlay {
+    transform: translateX(-3px);
+    transition: transform 0.15s ease;
+}
+
+/* 2. Íconos de navegación inferior */
+.bottom-nav-list a:active {
+    transform: scale(0.88) translateZ(0);
+}
+
+/* 3. Botón Play del Carrusel */
+.chapter-card-active button {
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 0.25s var(--ease-spring), box-shadow 0.25s ease, filter 0.25s ease;
+    animation: breathe-play 3.5s ease-in-out infinite;
+}
+
+@keyframes breathe-play {
+    0%, 100% {
+        transform: translateX(-50%) scale(1);
+        box-shadow: var(--glass-glow), 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    50% {
+        transform: translateX(-50%) scale(1.04);
+        box-shadow: var(--glass-glow), 0 6px 20px rgba(255, 255, 255, 0.15), 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+}
+
+.chapter-card-active button:active {
+    transform: translateX(-50%) scale(0.88) translateZ(0);
+    animation: none;
+}
+
+.chapter-card-active button svg {
+    transition: transform 0.2s var(--ease-spring);
+}
+
+.chapter-card-active button:active svg {
+    transform: translateX(2px);
+}
+
+/* 4. Botón CTA Overview ("Empezar a leer") */
+.cta-button {
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 0.2s var(--ease-spring), box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.cta-button:active {
+    transform: scale(0.94) translateZ(0);
+    filter: brightness(1.1);
+}
+
+/* 5. Indicadores del carrusel */
+.carousel-indicator {
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: width 0.3s var(--ease-spring), border-radius 0.3s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+
+.carousel-indicator:active {
+    transform: scale(0.85);
+}
+
+/* 6. Botones del lector (header y down-bar) */
+.reader-icons-interactions {
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 0.2s var(--ease-spring), background-color 0.2s ease, filter 0.2s ease;
+}
+
+.reader-icons-interactions:active {
+    transform: scale(0.9) translateZ(0);
+    filter: brightness(1.2);
+}
+
+#btn-prev:active svg,
+#btn-next:active svg {
+    transition: transform 0.15s ease;
+}
+
+#btn-prev:active svg {
+    transform: translateY(-2px);
+}
+
+#btn-next:active svg {
+    transform: translateY(2px);
+}
+
+/* 7. Botones de interacción en publicaciones del feed (Like, Dislike, Repost, Comentario) */
+.btn-like,
+.btn-dislike,
+.btn-repost,
+.btn-comment {
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 0.2s var(--ease-spring), color 0.2s ease, filter 0.2s ease;
+}
+
+.btn-like:active,
+.btn-dislike:active,
+.btn-repost:active,
+.btn-comment:active {
+    transform: scale(0.85) translateZ(0);
+}
+
+.btn-like svg,
+.btn-dislike svg,
+.btn-repost svg,
+.btn-comment svg {
+    transition: transform 0.25s var(--ease-spring);
+}
+
+/* 8. Botón primario de Publicar y acciones secundarias */
+.community-card-cta-publish {
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 0.2s var(--ease-spring), box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.community-card-cta-publish:active {
+    transform: scale(0.94) translateZ(0);
+}
+
+.btn-publish-action,
+.btn-remove-media {
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 0.2s var(--ease-spring), filter 0.2s ease;
+}
+
+.btn-publish-action:active {
+    transform: scale(0.88) translateZ(0);
+}
+
+.btn-remove-media:active {
+    transform: scale(0.85) rotate(90deg);
+}
+
+/* 9. Botones de modales y diálogos */
+.comments-modal-close,
+.comment-btn-send {
+    touch-action: manipulation;
+    transition: transform 0.2s var(--ease-spring), filter 0.2s ease;
+}
+
+.comments-modal-close:active {
+    transform: scale(0.88);
+}
+
+.comment-btn-send:active {
+    transform: scale(0.88) translate(1px, -1px);
+}
+
+#btn-cancelar,
+#btn-confirmar-logout,
+#btn-cancelar-edit,
+#btn-guardar-edit,
+.confirm-overlay-close {
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 0.2s var(--ease-spring), filter 0.2s ease;
+}
+
+#btn-cancelar:active,
+#btn-confirmar-logout:active,
+#btn-cancelar-edit:active,
+#btn-guardar-edit:active,
+.confirm-overlay-close:active {
+    transform: scale(0.92) translateZ(0);
+}
+
+/* 10. Pestañas de perfil y botón de seguir */
+.posts,
+.reposts {
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background-color 0.25s ease, color 0.25s ease, transform 0.2s var(--ease-spring);
+}
+
+.posts:active,
+.reposts:active {
+    transform: scale(0.95);
+}
+
+.follow-button,
+#btn-toggle-follow {
+    touch-action: manipulation;
+    transition: transform 0.2s var(--ease-spring), background-color 0.25s ease, border-color 0.25s ease;
+}
+
+#btn-toggle-follow:active {
+    transform: scale(0.92) translateZ(0);
+}
+
+/* 11. Filas de Ajustes y Toggle */
+.settings-panels-content[data-field] {
+    transition: transform 0.2s var(--ease-spring), background-color 0.2s ease;
+}
+
+.settings-panels-content[data-field]:active {
+    transform: scale(0.98) translateZ(0);
+}
+
+.settings-panels-content[data-field]:active .settings-icon {
+    transform: translateX(3px);
+}
+
+.settings-icon {
+    transition: transform 0.2s var(--ease-spring);
+}
+
+#settings-padding {
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 0.2s var(--ease-spring), background-color 0.2s ease;
+}
+
+#settings-padding:active {
+    transform: scale(0.98) translateZ(0);
+    background-color: rgba(196, 72, 72, 0.15);
+}
+
+.toggle-slider {
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.toggle-slider::before {
+    transition: transform 0.3s var(--ease-bounce);
+}
+
+/* Accesibilidad: Respetar preferencia de reducción de movimiento */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }
 

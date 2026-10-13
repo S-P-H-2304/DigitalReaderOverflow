@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
             link.removeAttribute('aria-current');
         }
 
-        // 3. Manejo optimizado de clics (No recargar si ya está en esta vista)
+        // 3. Manejo optimizado de clics y transición fluida del navbar
         link.addEventListener('click', (e) => {
             const clickedHref = link.getAttribute('href');
             if (isSamePage(clickedHref)) {
@@ -72,14 +72,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     top: 0,
                     behavior: 'smooth'
                 });
+            } else if (currentPage === 'community.html') {
+                // Al salir de Comunidad hacia Inicio o Perfil:
+                // Colapsar el botón '+' y re-centrar el navbar suavemente durante 200ms antes de cambiar de página
+                e.preventDefault();
+                bottomNav.classList.remove('is-community');
+                bottomNav.classList.add('is-leaving');
+                setTimeout(() => {
+                    window.location.href = clickedHref;
+                }, 200);
             }
         });
     });
 
-    // 4. Animación contextual en vista de comunidad
+    // 4. Animación contextual elástica al entrar a comunidad
     if (currentPage === 'community.html') {
+        // Breve retraso para que el usuario aprecie el deslizamiento a la izquierda y el brote del botón a la derecha
         setTimeout(() => {
-            bottomNav.classList.add('is-community');
-        }, 100);
+            requestAnimationFrame(() => {
+                bottomNav.classList.add('is-community');
+            });
+        }, 60);
     }
 });

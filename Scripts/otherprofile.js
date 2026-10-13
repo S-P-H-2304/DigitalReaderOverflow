@@ -218,6 +218,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }).join('');
 
         attachPostListeners();
+        if (window.Motion) {
+            window.Motion.animateFeedEntrance(feedContainer);
+        }
     }
 
     function attachPostListeners() {
@@ -234,6 +237,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const card = btn.closest('.post-card');
                 btn.querySelector('.count-like').textContent = res.likesCount;
                 btn.classList.toggle('active-like', res.hasLiked);
+
+                if (res.hasLiked && window.Motion) {
+                    window.Motion.popLike(btn);
+                }
 
                 const dislikeBtn = card.querySelector('.btn-dislike');
                 if (dislikeBtn) {
@@ -255,6 +262,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 btn.querySelector('.count-dislike').textContent = res.dislikesCount;
                 btn.classList.toggle('active-dislike', res.hasDisliked);
 
+                if (res.hasDisliked && window.Motion) {
+                    window.Motion.tiltDislike(btn);
+                }
+
                 const likeBtn = card.querySelector('.btn-like');
                 if (likeBtn) {
                     likeBtn.querySelector('.count-like').textContent = res.likesCount;
@@ -273,6 +284,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 btn.querySelector('.count-repost').textContent = res.repostsCount;
                 btn.classList.toggle('active-repost', res.hasReposted);
+
+                if (res.hasReposted && window.Motion) {
+                    window.Motion.spinRepost(btn);
+                }
             });
         });
 
@@ -280,6 +295,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         feedContainer.querySelectorAll('.btn-comment').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
+                if (window.Motion) {
+                    window.Motion.popComment(btn);
+                }
                 const postId = btn.getAttribute('data-post-id');
                 openCommentsModal(postId);
             });

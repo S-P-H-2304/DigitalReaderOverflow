@@ -27,4 +27,13 @@ document.addEventListener('DOMContentLoaded', () => {
             behavior: 'smooth'
         });
     });
+
+    // 4. Interacción con animación de Like en el lector
+    const likeBtn = document.querySelector('#likes-interaction .reader-icons-interactions');
+    if (likeBtn) {
+        likeBtn.addEventListener('click', () => {
+            likeBtn.classList.toggle('active-like');
+            if (window.Motion) window.Motion.popLike(likeBtn);
+        });
+    }
 });
