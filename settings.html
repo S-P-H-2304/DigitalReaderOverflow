@@ -22,13 +22,13 @@
     <main class="settings-container">
         <article class="profile-info-settings">
             <div class="profile-info-settings-pic-name">
-                <img class="profile-settings-pic" src="Images/Maclovin.png" alt="Maclovin pero ma Peque">
-                <h1>Maclovinsito_123</h1>
+                <img id="settings-user-pic" class="profile-settings-pic" src="Images/Maclovin.png" alt="Foto de perfil">
+                <h1 id="settings-user-header">Maclovinsito_123</h1>
             </div>
         </article>
         <article class="settings-panels">
             <div class="community-card-cta-container" id="gap-settings">
-                <div class="settings-panels-content">
+                <div class="settings-panels-content" data-field="nombres">
                     <h2>Nombres</h2>
                     <div class="settings-icon-container">
                         <p>Jhon</p>
@@ -37,7 +37,7 @@
                         </svg>
                     </div>
                 </div>
-                <div class="settings-panels-content">
+                <div class="settings-panels-content" data-field="apellidos">
                     <h2>Apellidos</h2>
                     <div class="settings-icon-container">
                         <p>McLovin</p>
@@ -48,7 +48,7 @@
                 </div>
             </div>
             <div class="community-card-cta-container" id="gap-settings">
-                <div class="settings-panels-content">
+                <div class="settings-panels-content" data-field="email">
                     <h2>Email</h2>
                     <div class="settings-icon-container">
                         <p>McLovin123@gmail.com</p>
@@ -57,7 +57,7 @@
                         </svg>
                     </div>
                 </div>
-                <div class="settings-panels-content">
+                <div class="settings-panels-content" data-field="password">
                     <h2>Contraseña</h2>
                     <div class="settings-icon-container">
                         <p>*******</p>
@@ -71,12 +71,32 @@
                 <div class="settings-panels-content">
                     <h2>Notificaciones</h2>
                     <label class="toggle-switch" aria-label="Activar notificaciones">
-                        <input type="checkbox" class="toggle-input" checked>
+                        <input type="checkbox" class="toggle-input" id="notifications-toggle" checked>
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
             </div>
         </article>
+        <!-- Pop up para editar datos de configuración -->
+        <div class="confirm-backdrop" id="edit-backdrop">
+            <article class="confirm-overlay-container">
+                <div class="confirm-overlay-content">
+                    <h2 id="edit-field-title">Editar campo</h2>
+                    <div class="edit-input-wrapper">
+                        <input type="text" id="edit-field-input" class="edit-modal-input" placeholder="Ingresa un nuevo valor" autocomplete="off" />
+                    </div>
+                    <div class="confirm-overlay-selection">
+                        <div id="btn-cancelar-edit" style="cursor: pointer;">
+                            <span>Cancelar</span>
+                        </div>
+                        <div class="confirm-overlay-close" id="btn-guardar-edit" style="cursor: pointer;">
+                            <span>Guardar</span>
+                        </div>
+                    </div>
+                </div>
+            </article>
+        </div>
+
         <div class="confirm-backdrop" id="logout-backdrop">
             <article class="confirm-overlay-container">
                 <div class="confirm-overlay-content">
@@ -101,6 +121,7 @@
             </div>
         </footer>
     </main>
+    <script src="Scripts/db.js"></script>
     <script src="Scripts/log-out.js"></script>
 </body>
 </html>

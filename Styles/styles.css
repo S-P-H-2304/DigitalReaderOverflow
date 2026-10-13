@@ -30,6 +30,11 @@ body {
     --glass-glow: inset 0 1px 1px rgba(255, 255, 255, 0.3);
     --border-radius: 100rem;
     font-size: 16px;
+
+    /* Semántica de Interacción en Publicaciones */
+    --like-color: #2ed573;                /* Verde positivo para Like / Me gusta */
+    --dislike-color: var(--danger-color); /* Rojo peligro/negativo para Dislike */
+    --repost-color: #38bdf8;              /* Cyan / Azul vibrante para Repost */
 }
 
 /* =========================================
@@ -47,6 +52,9 @@ body {
     --card-bg: rgba(197, 205, 216, 0.25);
     --button-bg: rgba(114, 140, 166, 0.45);
     --danger-color: #C44848;
+    --like-color: #2ed573;
+    --dislike-color: #C44848;
+    --repost-color: #50ACE5;
 }
 
 /* Paleta Capítulo 2 (Lector Palette 2) */
@@ -60,6 +68,9 @@ body {
     --danger-color: #C44040;
     --nav-bg: rgba(213, 162, 96, 0.12);
     --tab-container-bg: #081742;
+    --like-color: #2ed573;
+    --dislike-color: #C44040;
+    --repost-color: #70a1ff;
 }
 
 /* Paleta Capítulo 3 (Lector Palette 3) */
@@ -73,6 +84,9 @@ body {
     --danger-color: #D04848;
     --nav-bg: rgba(88, 133, 192, 0.12);
     --tab-container-bg: #353A4D;
+    --like-color: #2ed573;
+    --dislike-color: #D04848;
+    --repost-color: #50ACE5;
 }
 
 /* Paleta Capítulo 4 (Lector Palette 4) */
@@ -86,6 +100,9 @@ body {
     --danger-color: #D04848;
     --nav-bg: rgba(90, 24, 40, 0.12);
     --tab-container-bg: #5A1828;
+    --like-color: #2ed573;
+    --dislike-color: #D04848;
+    --repost-color: #60a5fa;
 }
 
 a {
@@ -209,6 +226,8 @@ a {
 
 .bottom-nav {
     display: flex;
+    align-items: center;
+    gap: 0.8rem;
     position: fixed;
     bottom: 2.5rem;
     left: 50%;
@@ -312,11 +331,42 @@ a {
 
 .bottom-nav-list a {
     display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    border-radius: 50%;
+    color: var(--on-surface);
+    opacity: 0.55;
+    position: relative;
+    cursor: pointer;
+    transition: opacity 0.25s ease, color 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
+.bottom-nav-list a:hover,
+.bottom-nav-list a:focus-visible {
+    opacity: 0.85;
+    transform: scale(1.08);
+}
+
+.bottom-nav-list a.active-nav-item,
+.bottom-nav-list a[aria-current="page"] {
+    opacity: 1;
+    color: var(--text-primary);
+    transform: scale(1.15);
+}
+
+.bottom-nav-list a.active-nav-item .bottom-nav-list-img,
+.bottom-nav-list a[aria-current="page"] .bottom-nav-list-img {
+    color: var(--text-primary);
+    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.45));
+}
+
 
 .bottom-nav-list-img {
     width: 2rem;
     height: 2rem;
+    color: currentColor;
+    transition: color 0.25s ease, filter 0.25s ease;
 }
 
 .chapter-overview-container {
@@ -421,6 +471,11 @@ a {
 .chapter-info-icon {
     width: 1rem;
     height: 0.8rem;
+    color: var(--text-primary);
+}
+
+.chapter-info-icon path {
+    fill: currentColor;
 }
 
 .sr-only {
@@ -458,8 +513,16 @@ a {
 .community-container {
     display: flex;
     flex-direction: column;
-    padding: 2.4rem 1.8rem 2.5rem;
-    gap: 1.25rem;
+    padding: 2.4rem 1.8rem 7.5rem;
+    gap: 2rem;
+}
+
+#community-feed,
+#profile-feed-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    width: 100%;
 }
 
 .community-card-cta-container {
@@ -584,8 +647,39 @@ a {
 .interaction-icon-container {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.45rem;
     color: var(--on-surface); /* icono + contador siguen la paleta */
+    background: transparent;
+    border: none;
+    padding: 0.4rem 0.6rem;   /* Touch target accesible mínimo para móvil */
+    min-height: 44px;
+    border-radius: 0.75rem;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.95rem;
+    transition: color 0.2s ease, transform 0.15s ease, background-color 0.2s ease;
+}
+
+.interaction-icon-container:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.interaction-icon-container:active {
+    transform: scale(0.92);
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Colores semánticos de interacción conectados con tokens de paleta */
+.active-like {
+    color: var(--like-color) !important;
+}
+
+.active-dislike {
+    color: var(--dislike-color) !important;
+}
+
+.active-repost {
+    color: var(--repost-color) !important;
 }
 
 .interaction-icon {
@@ -611,7 +705,7 @@ a {
 .profile-container {
     display: flex;
     flex-direction: column;
-    padding: 2.4rem 1.8rem 2.5rem;
+    padding: 2.4rem 1.8rem 7.5rem;
     gap: 2rem;
 }
 
@@ -1076,9 +1170,348 @@ a {
 .post-textarea::placeholder {
     color: white;
 }
+/* Modal de edición de campos */
+.edit-input-wrapper {
+    width: 100%;
+}
 
+.edit-modal-input {
+    width: 100%;
+    padding: 0.8rem 1.2rem;
+    border-radius: 1.5rem;
+    border: 1px solid var(--border-color);
+    background-color: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-family: inherit;
+    outline: none;
+    box-sizing: border-box;
+    border-top: var(--glass-border-top);
+    border-left: var(--glass-border-left);
+    border-bottom: var(--glass-border-bottom);
+    border-right: var(--glass-border-right);
+    box-shadow: var(--glass-glow);
+    -webkit-backdrop-filter: blur(15px);
+    backdrop-filter: blur(15px);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
 
+.edit-modal-input:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
+}
 
+.settings-panels-content[data-field] {
+    cursor: pointer;
+    border-radius: 1rem;
+    padding: 0.4rem 0.6rem;
+    margin: -0.4rem -0.6rem;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
+}
 
+.settings-panels-content[data-field]:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+}
 
+.settings-panels-content[data-field]:active {
+    opacity: 0.75;
+}
+
+.chapter-card-active {
+    cursor: pointer;
+}
+
+/* Post card details */
+.post-author-link {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    color: inherit;
+}
+
+.post-author-name {
+    text-decoration: none;
+    color: var(--text-primary);
+    font-weight: bold;
+}
+
+.post-time-text {
+    color: var(--on-surface);
+    font-size: 0.85rem;
+}
+
+.post-text-body p {
+    margin: 0;
+    line-height: 1.45;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+.post-media-box {
+    width: 100%;
+    border-radius: 1rem;
+    overflow: hidden;
+    margin: 0.4rem 0;
+    border: 1px solid var(--border-color);
+}
+
+.post-image-attachment {
+    width: 100%;
+    max-height: 22rem;
+    object-fit: cover;
+    display: block;
+}
+
+/* Overlay de publicación - media y acciones */
+.btn-publish-action {
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: inherit;
+    transition: transform 0.15s ease;
+}
+
+.btn-publish-action:active {
+    transform: scale(0.92);
+}
+
+.publish-media-preview-box {
+    position: relative;
+    margin: 1rem 0;
+    border-radius: 1rem;
+    overflow: hidden;
+    max-height: 14rem;
+    width: 100%;
+    border: 1px solid var(--border-color);
+}
+
+.publish-media-preview-box img {
+    width: 100%;
+    height: 100%;
+    max-height: 14rem;
+    object-fit: cover;
+    display: block;
+}
+
+.btn-remove-media {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: rgba(0, 0, 0, 0.65);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    width: 2rem;
+    height: 2rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+/* Modal de Comentarios (Bottom Sheet Glassmorphism) */
+.comments-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.comments-modal-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.comments-modal-sheet {
+    width: 100%;
+    max-width: 480px;
+    max-height: 80vh;
+    background: var(--card-bg, #1a1a24);
+    border-top-left-radius: 1.5rem;
+    border-top-right-radius: 1.5rem;
+    border-top: var(--glass-border-top);
+    border-left: var(--glass-border-left);
+    border-right: var(--glass-border-right);
+    box-shadow: var(--glass-glow), 0 -8px 24px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    padding: 1.2rem 1.4rem;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+}
+
+.comments-modal-backdrop.active .comments-modal-sheet {
+    transform: translateY(0);
+}
+
+.comments-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.comments-modal-title {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.comments-modal-close {
+    background: transparent;
+    border: none;
+    font-size: 1.8rem;
+    color: var(--on-surface);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.comments-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    min-height: 120px;
+    max-height: 48vh;
+}
+
+.empty-comments-box {
+    text-align: center;
+    color: var(--on-surface);
+    padding: 2rem 0;
+    font-size: 0.9rem;
+}
+
+.comment-item {
+    display: flex;
+    gap: 0.8rem;
+    align-items: flex-start;
+}
+
+.comment-avatar {
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.comment-content-box {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.6rem 0.8rem;
+    border-radius: 1rem;
+    flex: 1;
+}
+
+.comment-author-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.2rem;
+}
+
+.comment-author-name {
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+.comment-time {
+    font-size: 0.75rem;
+    color: var(--on-surface);
+}
+
+.comment-text {
+    font-size: 0.9rem;
+    margin: 0;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+.comment-input-row {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    padding-top: 0.8rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.comment-input-field {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-color);
+    border-radius: 1.2rem;
+    padding: 0.6rem 1rem;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+    outline: none;
+    border-top: var(--glass-border-top);
+    border-left: var(--glass-border-left);
+    border-bottom: var(--glass-border-bottom);
+    border-right: var(--glass-border-right);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+}
+
+.comment-btn-send {
+    background: var(--button-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    width: 2.4rem;
+    height: 2.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+    cursor: pointer;
+    flex-shrink: 0;
+    border-top: var(--glass-border-top);
+    border-left: var(--glass-border-left);
+    border-bottom: var(--glass-border-bottom);
+    border-right: var(--glass-border-right);
+    box-shadow: var(--glass-glow);
+}
+
+/* Edición interactiva de fotos en el perfil */
+.photo-editable {
+    cursor: pointer;
+    position: relative;
+    transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.photo-editable:hover {
+    filter: brightness(1.1);
+}
+
+.photo-editable:active {
+    opacity: 0.8;
+}
+
+/* Indicador de seguidor activo */
+.follow-state.active-following {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-color: var(--accent-color, #ffffff);
+}
 

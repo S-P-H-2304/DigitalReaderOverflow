@@ -1,29 +1,85 @@
+/**
+ * Overflow Bottom Navigation & Page Optimization (navigation.js)
+ * 
+ * Funcionalidades clave:
+ * 1. Resalta coherentemente el ítem activo en la barra inferior (aria-current="page", .active-nav-item).
+ * 2. Optimización UX: Si el usuario pulsa sobre el ícono de la pantalla en la que ya está 
+ *    (ej. pulsa Inicio mientras está en Inicio), previene la recarga completa del navegador 
+ *    y realiza un scroll suave hacia el tope superior (patrón estándar en apps móviles nativas).
+ * 3. Mantiene la coherencia de estados y animaciones en vista de comunidad.
+ */
+
 document.addEventListener('DOMContentLoaded', () => {
     const bottomNav = document.querySelector('.bottom-nav');
-    const isCommunityView = document.querySelector('.community-container') !== null;
-
     if (!bottomNav) return;
 
-    // Si estamos en la vista de comunidad
-    if (isCommunityView) {
-        // Retrasamos la activación 100ms para que la página cargue, 
-        // la barra nazca junta, y luego ocurra la animación de separación
+    const navLinks = bottomNav.querySelectorAll('.bottom-nav-list a');
+    if (!navLinks.length) return;
+
+    // 1. Identificar la vista actual normalizando la ruta
+    const currentPath = window.location.pathname.toLowerCase();
+    let currentPage = 'index.html';
+
+    if (currentPath.endsWith('community.html')) {
+        currentPage = 'community.html';
+    } else if (currentPath.endsWith('myprofile.html') || currentPath.endsWith('otherprofile.html')) {
+        currentPage = 'myprofile.html';
+    } else if (currentPath.endsWith('index.html') || currentPath === '/' || currentPath.endsWith('/')) {
+        currentPage = 'index.html';
+    } else {
+        const fileMatch = currentPath.match(/\/([^\/]+\.html)/);
+        if (fileMatch) {
+            currentPage = fileMatch[1];
+        }
+    }
+
+    function isSamePage(href) {
+        if (!href) return false;
+        const cleanHref = href.toLowerCase().split('?')[0].split('#')[0];
+        
+        if (currentPage === 'index.html') {
+            return cleanHref === 'index.html' || cleanHref === './' || cleanHref === '/' || cleanHref === '';
+        }
+        if (currentPage === 'community.html') {
+            return cleanHref === 'community.html';
+        }
+        if (currentPage === 'myprofile.html') {
+            return cleanHref === 'myprofile.html';
+        }
+        return cleanHref === currentPage;
+    }
+
+    // 2. Marcar visualmente el ítem activo
+    navLinks.forEach(link => {
+        const href = link.getAttribute('href');
+        const active = isSamePage(href);
+
+        if (active) {
+            link.classList.add('active-nav-item');
+            link.setAttribute('aria-current', 'page');
+        } else {
+            link.classList.remove('active-nav-item');
+            link.removeAttribute('aria-current');
+        }
+
+        // 3. Manejo optimizado de clics (No recargar si ya está en esta vista)
+        link.addEventListener('click', (e) => {
+            const clickedHref = link.getAttribute('href');
+            if (isSamePage(clickedHref)) {
+                e.preventDefault();
+                // Desplazamiento suave hacia arriba si hay scroll
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            }
+        });
+    });
+
+    // 4. Animación contextual en vista de comunidad
+    if (currentPage === 'community.html') {
         setTimeout(() => {
             bottomNav.classList.add('is-community');
         }, 100);
     }
-
-    // Manejo de clics en los enlaces de la barra
-    const navLinks = document.querySelectorAll('.bottom-nav-list a');
-    navLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            const target = link.getAttribute('href');
-
-            if (target === '#community' || target.includes('comunidad')) {
-                bottomNav.classList.add('is-community');
-            } else {
-                bottomNav.classList.remove('is-community');
-            }
-        });
-    });
 });
