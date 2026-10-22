@@ -20,12 +20,23 @@
         ACTIVE_CHAPTER: 'overflow_active_chapter',
         CURRENT_USER_ID: 'overflow_current_user_id',
         USERS: 'overflow_users',
-        POSTS: 'overflow_posts'
+        POSTS: 'overflow_posts',
+        CHAPTERS: 'overflow_chapters',
+        VOLUME_PREF: 'overflow_volume_pref'
     };
 
     const DEFAULT_AVATAR = 'Images/default-avatar.svg';
     const DEFAULT_BANNER = 'Images/default-banner.svg';
     const DEFAULT_CURRENT_USER_ID = 'user_mclovin';
+
+    const SEED_CHAPTERS = {
+        'chapter_1': {
+            id: 'chapter_1',
+            title: 'Capítulo 1: A la deriva',
+            likes: ['user_other'],
+            likesCount: 1200
+        }
+    };
 
     const SEED_USERS = {
         'user_mclovin': {
@@ -40,6 +51,7 @@
             banner: DEFAULT_BANNER,
             activeChapter: '1',
             notificationsEnabled: true,
+            volume: 80,
             followersCount: 322,
             followingCount: 540,
             following: [],
@@ -57,6 +69,7 @@
             banner: DEFAULT_BANNER,
             activeChapter: '1',
             notificationsEnabled: false,
+            volume: 80,
             followersCount: 120,
             followingCount: 85,
             following: [],
@@ -173,6 +186,12 @@
         if (!localStorage.getItem(STORAGE_KEYS.POSTS)) {
             localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(SEED_POSTS));
         }
+        if (!localStorage.getItem(STORAGE_KEYS.CHAPTERS)) {
+            localStorage.setItem(STORAGE_KEYS.CHAPTERS, JSON.stringify(SEED_CHAPTERS));
+        }
+        if (!localStorage.getItem(STORAGE_KEYS.VOLUME_PREF)) {
+            localStorage.setItem(STORAGE_KEYS.VOLUME_PREF, '80');
+        }
         sanitizeLegacyPlaceholders();
     }
 
@@ -275,6 +294,20 @@
                 if (otherFollowing) otherFollowing.textContent = targetUser.followingCount || 0;
             }
         }
+
+        // Pre-hidratar likes globales del capítulo en chapterReader.html
+        const chapterLikesCountEl = document.getElementById('chapter-likes-count');
+        const chapterLikeBtn = document.getElementById('btn-chapter-like');
+        const likesInteractionBox = document.getElementById('likes-interaction');
+        if (chapterLikesCountEl) {
+            const chapters = getStoredJSON(STORAGE_KEYS.CHAPTERS, SEED_CHAPTERS);
+            const ch = chapters['chapter_1'] || SEED_CHAPTERS['chapter_1'];
+            const activeUid = cachedUid || DEFAULT_CURRENT_USER_ID;
+            const hasLiked = Array.isArray(ch.likes) && ch.likes.includes(activeUid);
+            chapterLikesCountEl.textContent = ch.likesCount ?? 1200;
+            if (chapterLikeBtn) chapterLikeBtn.classList.toggle('active-like', hasLiked);
+            if (likesInteractionBox) likesInteractionBox.classList.toggle('active-like', hasLiked);
+        }
     }
 
     // Ejecutar pre-hidratación inmediatamente al evaluar este script (0ms)
@@ -339,9 +372,10 @@
 
                 firebaseReady = true;
 
-                // Sembrar datos iniciales y sincronizar posts en segundo plano
+                // Sembrar datos iniciales y sincronizar posts y capítulos en segundo plano
                 ensureSeedDataInFirestore().catch(() => {});
                 syncPostsFromFirestoreInBackground().catch(() => {});
+                syncChaptersFromFirestoreInBackground().catch(() => {});
 
                 return true;
             } catch (err) {
@@ -389,6 +423,34 @@
         }
     }
 
+    async function syncChaptersFromFirestoreInBackground() {
+        if (!fbDb || !fsModRef) return null;
+        try {
+            const chaptersCol = fsModRef.collection(fbDb, 'chapters');
+            const snap = await fsModRef.getDocs(chaptersCol);
+            const cloudChapters = getStoredJSON(STORAGE_KEYS.CHAPTERS, SEED_CHAPTERS);
+            let hasDocs = false;
+            snap.forEach(docSnap => {
+                const data = docSnap.data();
+                if (data && data.id) {
+                    cloudChapters[data.id] = data;
+                    hasDocs = true;
+                }
+            });
+            if (hasDocs) {
+                const prevRaw = localStorage.getItem(STORAGE_KEYS.CHAPTERS);
+                const nextRaw = JSON.stringify(cloudChapters);
+                if (prevRaw !== nextRaw) {
+                    localStorage.setItem(STORAGE_KEYS.CHAPTERS, nextRaw);
+                    window.dispatchEvent(new CustomEvent('overflow:chapters-synced', { detail: cloudChapters }));
+                }
+            }
+            return cloudChapters;
+        } catch (e) {
+            return null;
+        }
+    }
+
     async function ensureUserProfileInFirestore(authUser) {
         if (!fbDb || !fsModRef || !authUser) return null;
 
@@ -427,6 +489,13 @@
                 document.documentElement.setAttribute('data-chapter', ch);
             }
 
+            if (typeof data.volume === 'number') {
+                localStorage.setItem(STORAGE_KEYS.VOLUME_PREF, String(Math.round(data.volume)));
+            } else {
+                const localVol = Number(localStorage.getItem(STORAGE_KEYS.VOLUME_PREF) || 80);
+                data.volume = localVol;
+            }
+
             cacheUserProfileLocally(data);
             return data;
         }
@@ -445,6 +514,8 @@
             || localStorage.getItem('activeChapter')
             || '1';
 
+        const currentLocalVolume = Number(localStorage.getItem(STORAGE_KEYS.VOLUME_PREF) || 80);
+
         const newProfile = {
             id: authUser.uid,
             username: cleanUsername,
@@ -457,6 +528,7 @@
             banner: DEFAULT_BANNER,
             activeChapter: String(currentLocalChapter),
             notificationsEnabled: true,
+            volume: currentLocalVolume,
             followersCount: 0,
             followingCount: 0,
             following: [],
@@ -487,6 +559,14 @@
             for (const post of SEED_POSTS) {
                 const pRef = fsModRef.doc(fbDb, 'posts', post.id);
                 await fsModRef.setDoc(pRef, post);
+            }
+        }
+
+        for (const chId of Object.keys(SEED_CHAPTERS)) {
+            const cRef = fsModRef.doc(fbDb, 'chapters', chId);
+            const cSnap = await fsModRef.getDoc(cRef);
+            if (!cSnap.exists()) {
+                await fsModRef.setDoc(cRef, SEED_CHAPTERS[chId]);
             }
         }
     }
@@ -664,6 +744,122 @@
                     } catch (e) {}
                 }
             });
+        },
+
+        async getVolumePreference() {
+            const cachedUid = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
+            const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
+            if (cachedUid && users[cachedUid] && typeof users[cachedUid].volume === 'number') {
+                return Math.min(100, Math.max(0, Math.round(users[cachedUid].volume)));
+            }
+            const rawVol = localStorage.getItem(STORAGE_KEYS.VOLUME_PREF);
+            const parsed = rawVol !== null ? Number(rawVol) : 80;
+            return Number.isFinite(parsed) ? Math.min(100, Math.max(0, Math.round(parsed))) : 80;
+        },
+
+        async setVolumePreference(volume) {
+            const clamped = Math.min(100, Math.max(0, Math.round(Number(volume) || 0)));
+            localStorage.setItem(STORAGE_KEYS.VOLUME_PREF, String(clamped));
+
+            const cachedUid = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || DEFAULT_CURRENT_USER_ID;
+            const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
+            if (users[cachedUid]) {
+                users[cachedUid].volume = clamped;
+                setStoredJSON(STORAGE_KEYS.USERS, users);
+            }
+
+            // Debounce / sincronizar en segundo plano con el documento del usuario en Cloud Firestore
+            if (this._volSyncTimer) clearTimeout(this._volSyncTimer);
+            this._volSyncTimer = setTimeout(() => {
+                initFirebase().then(async () => {
+                    const targetUid = (currentAuthUser && currentAuthUser.uid) || cachedUid;
+                    if (targetUid && fbDb && fsModRef) {
+                        try {
+                            const userRef = fsModRef.doc(fbDb, 'users', targetUid);
+                            await fsModRef.setDoc(userRef, { volume: clamped }, { merge: true });
+                        } catch (e) {}
+                    }
+                });
+            }, 250);
+
+            return clamped;
+        },
+
+        async getChapterStats(chapterId = 'chapter_1') {
+            const chapters = getStoredJSON(STORAGE_KEYS.CHAPTERS, SEED_CHAPTERS);
+            const ch = chapters[chapterId] || SEED_CHAPTERS[chapterId] || {
+                id: chapterId,
+                title: 'Capítulo 1: A la deriva',
+                likes: [],
+                likesCount: 1200
+            };
+
+            const currentUserId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID)
+                || (currentAuthUser && currentAuthUser.uid)
+                || DEFAULT_CURRENT_USER_ID;
+
+            const hasLiked = Array.isArray(ch.likes) && ch.likes.includes(currentUserId);
+
+            // Sincronizar en segundo plano con Firestore
+            initFirebase().then(() => syncChaptersFromFirestoreInBackground());
+
+            return {
+                id: ch.id,
+                likesCount: typeof ch.likesCount === 'number' ? ch.likesCount : 1200,
+                hasLiked,
+                likes: Array.isArray(ch.likes) ? ch.likes : []
+            };
+        },
+
+        async toggleChapterLike(chapterId = 'chapter_1') {
+            const currentUserId = await this.getCurrentUserId();
+            const chapters = getStoredJSON(STORAGE_KEYS.CHAPTERS, SEED_CHAPTERS);
+            if (!chapters[chapterId]) {
+                chapters[chapterId] = {
+                    ...(SEED_CHAPTERS[chapterId] || {
+                        id: chapterId,
+                        title: 'Capítulo 1: A la deriva',
+                        likes: [],
+                        likesCount: 1200
+                    })
+                };
+            }
+
+            const ch = chapters[chapterId];
+            if (!Array.isArray(ch.likes)) ch.likes = [];
+            if (typeof ch.likesCount !== 'number') ch.likesCount = 1200;
+
+            const alreadyLiked = ch.likes.includes(currentUserId);
+            if (alreadyLiked) {
+                ch.likes = ch.likes.filter(id => id !== currentUserId);
+                ch.likesCount = Math.max(0, ch.likesCount - 1);
+            } else {
+                ch.likes.push(currentUserId);
+                ch.likesCount = ch.likesCount + 1;
+            }
+
+            setStoredJSON(STORAGE_KEYS.CHAPTERS, chapters);
+
+            // Sincronizar globalmente con Cloud Firestore
+            initFirebase().then(async () => {
+                if (fbDb && fsModRef) {
+                    try {
+                        await fsModRef.setDoc(fsModRef.doc(fbDb, 'chapters', chapterId), {
+                            id: ch.id,
+                            title: ch.title || 'Capítulo 1: A la deriva',
+                            likes: ch.likes,
+                            likesCount: ch.likesCount
+                        }, { merge: true });
+                    } catch (e) {
+                        console.warn('[Firestore toggleChapterLike Sync Warning]', e);
+                    }
+                }
+            });
+
+            return {
+                likesCount: ch.likesCount,
+                hasLiked: !alreadyLiked
+            };
         },
 
         // ==========================================

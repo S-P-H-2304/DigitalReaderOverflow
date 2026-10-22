@@ -1,39 +1,427 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Capturamos los elementos
+document.addEventListener('DOMContentLoaded', async () => {
+    // =========================================================================
+    // 0. REFERENCIAS PRINCIPALES DEL LECTOR Y HUD DINÁMICO
+    // =========================================================================
     const visor = document.getElementById('visor');
     const btnPrev = document.getElementById('btn-prev');
     const btnNext = document.getElementById('btn-next');
+    const topBar = document.querySelector('header.reader-header');
+    const downBar = document.getElementById('down-bar');
 
-    // Validación de seguridad
-    if (!visor || !btnPrev || !btnNext) return;
+    let isHudVisible = true;
+    let isProgrammaticScroll = false;
+    let programmaticScrollTimer = null;
 
-    // Desplazamiento proporcional fluido (tira vertical)
-    const getScrollStep = () => Math.round(window.innerHeight * 0.75);
+    // =========================================================================
+    // 1. CONTROLES DE DESPLAZAMIENTO (INTACTOS)
+    // =========================================================================
+    if (visor && btnPrev && btnNext) {
+        const getScrollStep = () => Math.round(window.innerHeight * 0.75);
 
-    // 2. Acción para bajar en la tira
-    btnNext.addEventListener('click', () => {
-        visor.scrollBy({
-            top: getScrollStep(),
-            left: 0,
-            behavior: 'smooth'
+        const markProgrammaticScroll = () => {
+            isProgrammaticScroll = true;
+            if (programmaticScrollTimer) clearTimeout(programmaticScrollTimer);
+            programmaticScrollTimer = setTimeout(() => {
+                isProgrammaticScroll = false;
+            }, 650);
+        };
+
+        btnNext.addEventListener('click', () => {
+            markProgrammaticScroll();
+            visor.scrollBy({
+                top: getScrollStep(),
+                left: 0,
+                behavior: 'smooth'
+            });
         });
-    });
 
-    // 3. Acción para subir en la tira
-    btnPrev.addEventListener('click', () => {
-        visor.scrollBy({
-            top: -getScrollStep(),
-            left: 0,
-            behavior: 'smooth'
-        });
-    });
-
-    // 4. Interacción con animación de Like en el lector
-    const likeBtn = document.querySelector('#likes-interaction .reader-icons-interactions');
-    if (likeBtn) {
-        likeBtn.addEventListener('click', () => {
-            likeBtn.classList.toggle('active-like');
-            if (window.Motion) window.Motion.popLike(likeBtn);
+        btnPrev.addEventListener('click', () => {
+            markProgrammaticScroll();
+            visor.scrollBy({
+                top: -getScrollStep(),
+                left: 0,
+                behavior: 'smooth'
+            });
         });
     }
+
+    // =========================================================================
+    // 2. BOTÓN DE LIKE GLOBAL DEL CAPÍTULO + ANIMACIÓN DE CORAZÓN (ABAJO)
+    // =========================================================================
+    const likesInteraction = document.getElementById('likes-interaction');
+    const likeBtn = document.getElementById('btn-chapter-like')
+        || document.querySelector('#likes-interaction .reader-icons-interactions');
+    const likesCountEl = document.getElementById('chapter-likes-count')
+        || document.querySelector('#likes-interaction span');
+
+    function applyChapterLikeState(likesCount, hasLiked) {
+        if (likesCountEl) {
+            likesCountEl.textContent = likesCount;
+        }
+        if (likeBtn) {
+            likeBtn.classList.toggle('active-like', Boolean(hasLiked));
+            likeBtn.setAttribute('aria-pressed', hasLiked ? 'true' : 'false');
+        }
+        if (likesInteraction) {
+            likesInteraction.classList.toggle('active-like', Boolean(hasLiked));
+        }
+    }
+
+    if (window.DB) {
+        const initialStats = await window.DB.getChapterStats('chapter_1');
+        if (initialStats) {
+            applyChapterLikeState(initialStats.likesCount, initialStats.hasLiked);
+        }
+
+        window.addEventListener('overflow:chapters-synced', async (e) => {
+            const chapters = e.detail;
+            if (chapters && chapters['chapter_1']) {
+                const ch = chapters['chapter_1'];
+                const uid = await window.DB.getCurrentUserId();
+                const hasLiked = Array.isArray(ch.likes) && ch.likes.includes(uid);
+                applyChapterLikeState(ch.likesCount ?? 1200, hasLiked);
+            }
+        });
+    }
+
+    if (likeBtn) {
+        likeBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (window.DB) {
+                const res = await window.DB.toggleChapterLike('chapter_1');
+                if (res) {
+                    applyChapterLikeState(res.likesCount, res.hasLiked);
+                }
+            } else {
+                const nextLiked = !likeBtn.classList.contains('active-like');
+                const currentVal = parseInt(likesCountEl ? likesCountEl.textContent : '1200', 10) || 1200;
+                applyChapterLikeState(nextLiked ? currentVal + 1 : Math.max(0, currentVal - 1), nextLiked);
+            }
+
+            if (window.Motion) {
+                window.Motion.popLike(likeBtn);
+            }
+        });
+    }
+
+    // =========================================================================
+    // 3. BOTONES SUPERIORES: VOLUMEN VERTICAL, ACCESO RÁPIDO A CAPÍTULOS Y 3 PUNTOS
+    // =========================================================================
+    const btnVolume = document.getElementById('btn-reader-volume');
+    const volumePopover = document.getElementById('volume-popover');
+    const volumeTrack = document.getElementById('volume-slider-track');
+    const volumeFill = document.getElementById('volume-slider-fill');
+    const volumeThumb = document.getElementById('volume-slider-thumb');
+    const volumeLabel = document.getElementById('volume-value-label');
+    const btnVolumeMute = document.getElementById('btn-volume-mute');
+
+    const btnChapters = document.getElementById('btn-reader-chapters');
+    const chaptersPopover = document.getElementById('chapters-popover');
+    const chaptersToast = document.getElementById('chapters-unavailable-toast');
+
+    const btnMore = document.getElementById('btn-reader-more');
+
+    let currentVolume = 80;
+    let lastNonZeroVolume = 80;
+    let toastTimer = null;
+
+    function updateVolumeUI(vol) {
+        const clamped = Math.min(100, Math.max(0, Math.round(Number(vol) || 0)));
+        currentVolume = clamped;
+        if (clamped > 0) lastNonZeroVolume = clamped;
+
+        if (volumeFill) volumeFill.style.height = `${clamped}%`;
+        if (volumeThumb) volumeThumb.style.bottom = `${clamped}%`;
+        if (volumeLabel) volumeLabel.textContent = `${clamped}%`;
+        if (volumeTrack) volumeTrack.setAttribute('aria-valuenow', String(clamped));
+
+        if (btnVolumeMute) {
+            btnVolumeMute.classList.toggle('is-muted', clamped === 0);
+        }
+
+        if (btnVolume) {
+            const waveHigh = btnVolume.querySelector('.vol-wave-high');
+            const waveMid = btnVolume.querySelector('.vol-wave-mid');
+            if (waveHigh) waveHigh.style.opacity = clamped >= 65 ? '1' : '0.22';
+            if (waveMid) waveMid.style.opacity = clamped >= 25 ? '1' : '0.22';
+            btnVolume.classList.toggle('is-muted-volume', clamped === 0);
+        }
+    }
+
+    if (window.DB) {
+        const savedVol = await window.DB.getVolumePreference();
+        updateVolumeUI(savedVol);
+    } else {
+        updateVolumeUI(80);
+    }
+
+    function isAnyPopoverOpen() {
+        return Boolean(
+            (volumePopover && volumePopover.classList.contains('is-open')) ||
+            (chaptersPopover && chaptersPopover.classList.contains('is-open'))
+        );
+    }
+
+    function closeAllPopovers() {
+        if (volumePopover && volumePopover.classList.contains('is-open')) {
+            volumePopover.classList.remove('is-open');
+            volumePopover.setAttribute('aria-hidden', 'true');
+            if (btnVolume) {
+                btnVolume.classList.remove('active-control');
+                btnVolume.setAttribute('aria-expanded', 'false');
+            }
+        }
+        if (chaptersPopover && chaptersPopover.classList.contains('is-open')) {
+            chaptersPopover.classList.remove('is-open');
+            chaptersPopover.setAttribute('aria-hidden', 'true');
+            if (btnChapters) {
+                btnChapters.classList.remove('active-control');
+                btnChapters.setAttribute('aria-expanded', 'false');
+            }
+        }
+    }
+
+    // --- 3.1. Toggle del Popover Vertical de Volumen ---
+    if (btnVolume && volumePopover) {
+        btnVolume.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (window.Motion) window.Motion.popReaderControl(btnVolume);
+
+            const willOpen = !volumePopover.classList.contains('is-open');
+            closeAllPopovers();
+
+            if (willOpen) {
+                volumePopover.classList.add('is-open');
+                volumePopover.setAttribute('aria-hidden', 'false');
+                btnVolume.classList.add('active-control');
+                btnVolume.setAttribute('aria-expanded', 'true');
+            }
+        });
+
+        volumePopover.addEventListener('click', (e) => e.stopPropagation());
+    }
+
+    if (volumeTrack) {
+        let isDraggingVolume = false;
+
+        const setVolumeFromPointer = (clientY) => {
+            const rect = volumeTrack.getBoundingClientRect();
+            if (!rect.height) return;
+            const relativeY = rect.bottom - clientY;
+            const ratio = Math.min(1, Math.max(0, relativeY / rect.height));
+            const newVol = Math.round(ratio * 100);
+            updateVolumeUI(newVol);
+            if (window.DB) window.DB.setVolumePreference(newVol);
+        };
+
+        volumeTrack.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            isDraggingVolume = true;
+            volumeTrack.classList.add('is-dragging');
+            if (volumeTrack.setPointerCapture) {
+                try { volumeTrack.setPointerCapture(e.pointerId); } catch (_) {}
+            }
+            setVolumeFromPointer(e.clientY);
+        });
+
+        volumeTrack.addEventListener('pointermove', (e) => {
+            if (!isDraggingVolume) return;
+            setVolumeFromPointer(e.clientY);
+        });
+
+        const endVolumeDrag = (e) => {
+            if (!isDraggingVolume) return;
+            isDraggingVolume = false;
+            volumeTrack.classList.remove('is-dragging');
+            if (volumeTrack.releasePointerCapture && e && e.pointerId !== undefined) {
+                try { volumeTrack.releasePointerCapture(e.pointerId); } catch (_) {}
+            }
+        };
+
+        volumeTrack.addEventListener('pointerup', endVolumeDrag);
+        volumeTrack.addEventListener('pointercancel', endVolumeDrag);
+
+        volumeTrack.addEventListener('keydown', (e) => {
+            let nextVol = currentVolume;
+            if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                nextVol = Math.min(100, currentVolume + 5);
+            } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+                e.preventDefault();
+                nextVol = Math.max(0, currentVolume - 5);
+            } else if (e.key === 'Home') {
+                e.preventDefault();
+                nextVol = 0;
+            } else if (e.key === 'End') {
+                e.preventDefault();
+                nextVol = 100;
+            } else {
+                return;
+            }
+            updateVolumeUI(nextVol);
+            if (window.DB) window.DB.setVolumePreference(nextVol);
+        });
+    }
+
+    if (btnVolumeMute) {
+        btnVolumeMute.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const targetVol = currentVolume > 0 ? 0 : (lastNonZeroVolume || 80);
+            updateVolumeUI(targetVol);
+            if (window.DB) window.DB.setVolumePreference(targetVol);
+            if (window.Motion) window.Motion.popReaderControl(btnVolumeMute);
+        });
+    }
+
+    // --- 3.2. Toggle del Menú de Acceso Rápido a Capítulos ---
+    if (btnChapters && chaptersPopover) {
+        btnChapters.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (window.Motion) window.Motion.popReaderControl(btnChapters);
+
+            const willOpen = !chaptersPopover.classList.contains('is-open');
+            closeAllPopovers();
+
+            if (willOpen) {
+                chaptersPopover.classList.add('is-open');
+                chaptersPopover.setAttribute('aria-hidden', 'false');
+                btnChapters.classList.add('active-control');
+                btnChapters.setAttribute('aria-expanded', 'true');
+
+                if (window.gsap) {
+                    const items = chaptersPopover.querySelectorAll('.chapter-quick-item');
+                    gsap.fromTo(items,
+                        { y: 8, opacity: 0 },
+                        { y: 0, opacity: 1, duration: 0.22, stagger: 0.04, ease: 'power2.out', clearProps: 'transform,opacity' }
+                    );
+                }
+            }
+        });
+
+        chaptersPopover.addEventListener('click', (e) => e.stopPropagation());
+
+        const chapterItems = chaptersPopover.querySelectorAll('.chapter-quick-item');
+        chapterItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isAvailable = item.getAttribute('data-available') === 'true';
+                const chNum = item.getAttribute('data-chapter-num') || '';
+
+                if (isAvailable) {
+                    closeAllPopovers();
+                    if (visor) {
+                        isProgrammaticScroll = true;
+                        if (programmaticScrollTimer) clearTimeout(programmaticScrollTimer);
+                        programmaticScrollTimer = setTimeout(() => { isProgrammaticScroll = false; }, 650);
+                        visor.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                } else {
+                    if (window.Motion) window.Motion.shakeLocked(item);
+                    if (chaptersToast) {
+                        chaptersToast.textContent = `Capítulo ${chNum}: Contenido no disponible`;
+                        chaptersToast.classList.add('is-visible');
+                        if (toastTimer) clearTimeout(toastTimer);
+                        toastTimer = setTimeout(() => {
+                            chaptersToast.classList.remove('is-visible');
+                        }, 2200);
+                    }
+                }
+            });
+        });
+    }
+
+    // --- 3.3. Botón de 3 Puntos ---
+    if (btnMore) {
+        btnMore.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeAllPopovers();
+            if (window.Motion) window.Motion.popReaderControl(btnMore);
+        });
+    }
+
+    // =========================================================================
+    // 4. MENÚ / HUD DINÁMICO INMERSIVO (OCULTAR AL DESLIZAR, MOSTRAR AL TOCAR)
+    // =========================================================================
+    function showReaderHUD() {
+        if (isHudVisible) return;
+        isHudVisible = true;
+        if (topBar) topBar.classList.remove('hud-hidden');
+        if (downBar) downBar.classList.remove('hud-hidden');
+    }
+
+    function hideReaderHUD() {
+        if (!isHudVisible) return;
+        isHudVisible = false;
+        closeAllPopovers();
+        if (topBar) topBar.classList.add('hud-hidden');
+        if (downBar) downBar.classList.add('hud-hidden');
+    }
+
+    function toggleReaderHUD() {
+        if (isHudVisible) {
+            if (isAnyPopoverOpen()) {
+                closeAllPopovers();
+            } else {
+                hideReaderHUD();
+            }
+        } else {
+            showReaderHUD();
+        }
+    }
+
+    if (visor) {
+        let lastScrollTop = visor.scrollTop;
+        let scrollTicking = false;
+
+        // Ocultar barras automáticamente mientras el usuario desliza la tira
+        visor.addEventListener('scroll', () => {
+            if (scrollTicking) return;
+            scrollTicking = true;
+
+            requestAnimationFrame(() => {
+                const currentScrollTop = visor.scrollTop;
+                const delta = Math.abs(currentScrollTop - lastScrollTop);
+
+                if (!isProgrammaticScroll && delta > 7) {
+                    hideReaderHUD();
+                }
+
+                lastScrollTop = currentScrollTop;
+                scrollTicking = false;
+            });
+        }, { passive: true });
+
+        // Detectar toque limpio (tap) en el visor para mostrar/ocultar el menú
+        let pointerStartX = 0;
+        let pointerStartY = 0;
+        let pointerStartTime = 0;
+        let pointerMoved = false;
+
+        visor.addEventListener('pointerdown', (e) => {
+            pointerStartX = e.clientX;
+            pointerStartY = e.clientY;
+            pointerStartTime = Date.now();
+            pointerMoved = false;
+        }, { passive: true });
+
+        visor.addEventListener('pointermove', (e) => {
+            if (pointerMoved) return;
+            const dist = Math.hypot(e.clientX - pointerStartX, e.clientY - pointerStartY);
+            if (dist > 10) {
+                pointerMoved = true;
+            }
+        }, { passive: true });
+
+        visor.addEventListener('pointerup', (e) => {
+            const elapsed = Date.now() - pointerStartTime;
+            const dist = Math.hypot(e.clientX - pointerStartX, e.clientY - pointerStartY);
+            if (!pointerMoved && dist <= 10 && elapsed < 450) {
+                toggleReaderHUD();
+            }
+        });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeAllPopovers();
+    });
 });

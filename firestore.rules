@@ -20,6 +20,7 @@ rules_version = '2';
 //   - banner: string (optional, 0..800000 chars) - Banner image path, URL, or compressed Base64 data URL
 //   - activeChapter: string (optional, 0..20 chars) - Active chapter theme ID
 //   - notificationsEnabled: bool (optional) - Notification preference toggle
+//   - volume: number (optional, 0..100) - Reader volume preference
 //   - followersCount: number (optional, >= 0) - Number of followers
 //   - followingCount: number (optional, >= 0) - Number of followed users
 //   - following: list of strings (optional, max 2000 items) - IDs of users followed
@@ -40,6 +41,14 @@ rules_version = '2';
 //   - dislikes: list of strings (required, max 5000 items) - User IDs who disliked the post
 //   - reposts: list of strings (required, max 5000 items) - User IDs who reposted the post
 //   - comments: list of maps (required, max 1000 items) - Embedded comment objects
+//
+// Collection: chapters
+// Document ID: {chapterId} (e.g., 'chapter_1')
+// Fields:
+//   - id: string (required, immutable, matches {chapterId}, max 128 chars) - Chapter ID
+//   - title: string (optional, 0..200 chars) - Chapter title
+//   - likes: list of strings (required, max 10000 items) - User IDs who liked the chapter
+//   - likesCount: number (required, >= 0) - Global chapter like counter
 //
 // ===============================================================
 
@@ -109,6 +118,14 @@ service cloud.firestore {
               request.resource.data[field] <= 9999999999999);
     }
 
+    // Validate optional bounded number
+    function isValidOptionalBoundedNumber(field, minVal, maxVal) {
+      return !(field in request.resource.data) ||
+             ((request.resource.data[field] is int || request.resource.data[field] is float) &&
+              request.resource.data[field] >= minVal &&
+              request.resource.data[field] <= maxVal);
+    }
+
     // Validate optional boolean
     function isValidOptionalBool(field) {
       return !(field in request.resource.data) ||
@@ -163,7 +180,7 @@ service cloud.firestore {
       let allowedFields = [
         'id', 'username', 'nombres', 'apellidos', 'email', 'password',
         'bio', 'avatar', 'banner', 'activeChapter', 'notificationsEnabled',
-        'followersCount', 'followingCount', 'following', 'reposts', 'createdAt'
+        'volume', 'followersCount', 'followingCount', 'following', 'reposts', 'createdAt'
       ];
       return hasOnlyAllowedFields(allowedFields) &&
              hasRequiredFields(['id', 'username']) &&
@@ -179,6 +196,7 @@ service cloud.firestore {
              isValidOptionalString('banner', 0, 800000) &&
              isValidOptionalString('activeChapter', 0, 20) &&
              isValidOptionalBool('notificationsEnabled') &&
+             isValidOptionalBoundedNumber('volume', 0, 100) &&
              isValidOptionalNonNegativeNumber('followersCount') &&
              isValidOptionalNonNegativeNumber('followingCount') &&
              isValidOptionalStringList('following', 2000) &&
@@ -205,6 +223,21 @@ service cloud.firestore {
              isValidOptionalStringList('dislikes', 5000) &&
              isValidOptionalStringList('reposts', 5000) &&
              isValidCommentsList(data.comments);
+    }
+
+    function isValidChapter(data, chapterId) {
+      let allowedFields = [
+        'id', 'title', 'likes', 'likesCount'
+      ];
+      return hasOnlyAllowedFields(allowedFields) &&
+             hasRequiredFields(['id', 'likes', 'likesCount']) &&
+             idMatchesPath(chapterId) &&
+             data.id is string && data.id.size() >= 1 && data.id.size() <= 128 &&
+             isValidOptionalString('title', 0, 200) &&
+             isValidOptionalStringList('likes', 10000) &&
+             (data.likesCount is int || data.likesCount is float) &&
+             data.likesCount >= 0 &&
+             data.likesCount <= 9999999999999;
     }
 
     // ===============================================================
@@ -257,6 +290,22 @@ service cloud.firestore {
 
       // Only the post author can delete their post
       allow delete: if isPostAuthor();
+    }
+
+    match /chapters/{chapterId} {
+      // Public read access so any reader can see the global chapter like count
+      allow read: if true;
+
+      // Authenticated users can create or seed chapter documents with valid schema
+      allow create: if isAuthenticated() &&
+                       isValidChapter(request.resource.data, chapterId);
+
+      // Authenticated users can update chapter likes and likesCount while preserving immutable id
+      allow update: if isAuthenticated() &&
+                       isValidChapter(request.resource.data, chapterId) &&
+                       idNotModified();
+
+      allow delete: if false;
     }
 
     // Default deny for all other collections and paths

@@ -2057,6 +2057,429 @@ a,
     display: none;
 }
 
+/* ========================================================
+   13. CONTROLES AVANZADOS DEL LECTOR (LIKE GLOBAL, VOLUMEN VERTICAL Y CAPÍTULOS)
+======================================================== */
+
+.reader-top-pill {
+    position: relative;
+}
+
+.reader-action-anchor {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.reader-icons-interactions {
+    color: var(--text-primary);
+}
+
+.reader-icons-interactions.active-control {
+    color: var(--accent-color);
+    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.35));
+}
+
+.reader-icons-interactions .vol-wave-high,
+.reader-icons-interactions .vol-wave-mid {
+    transition: opacity 0.2s ease;
+}
+
+/* Botón de Like del Capítulo y Animación del Corazón */
+#likes-interaction {
+    transition: transform 0.2s var(--ease-spring), border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+#likes-interaction.active-like {
+    border-color: rgba(46, 213, 115, 0.45);
+    box-shadow: var(--glass-glow), 0 4px 16px rgba(46, 213, 115, 0.2);
+}
+
+#btn-chapter-like {
+    display: flex;
+    align-items: center;
+    gap: 0.1rem;
+    padding-right: 0.4rem;
+    color: var(--text-primary);
+}
+
+#btn-chapter-like .count-like {
+    width: auto;
+    min-width: 2.2rem;
+    height: auto;
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: inherit;
+    transition: color 0.2s ease;
+}
+
+#btn-chapter-like.active-like,
+#btn-chapter-like.active-like .count-like {
+    color: var(--like-color) !important;
+}
+
+.heart-svg .heart-fill-layer {
+    opacity: 0;
+    transform: scale(0.3);
+    transform-origin: 50% 50%;
+    transition: opacity 0.22s ease, transform 0.25s var(--ease-spring);
+}
+
+#btn-chapter-like.active-like .heart-svg .heart-fill-layer {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Popover Vertical de Volumen */
+.reader-volume-popover {
+    position: absolute;
+    top: calc(100% + 0.85rem);
+    left: 50%;
+    transform: translateX(-50%) translateY(-8px) scale(0.9);
+    transform-origin: top center;
+    width: 3.2rem;
+    padding: 0.8rem 0.45rem;
+    border-radius: 2rem;
+    background: rgba(34, 43, 52, 0.92);
+    border-top: var(--glass-border-top);
+    border-left: var(--glass-border-left);
+    border-bottom: var(--glass-border-bottom);
+    border-right: var(--glass-border-right);
+    box-shadow: var(--glass-glow), 0 14px 30px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.65rem;
+    z-index: 250;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.22s ease, transform 0.28s var(--ease-spring), visibility 0.22s ease;
+}
+
+.reader-volume-popover.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0) scale(1);
+}
+
+.volume-percentage-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-align: center;
+    line-height: 1;
+    user-select: none;
+}
+
+.volume-slider-track-wrapper {
+    position: relative;
+    width: 2.2rem;
+    height: 7.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    outline: none;
+}
+
+.volume-slider-track-wrapper:focus-visible .volume-slider-thumb {
+    box-shadow: 0 0 0 3px var(--accent-color), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.volume-slider-track-bg {
+    position: relative;
+    width: 0.42rem;
+    height: 100%;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    overflow: hidden;
+}
+
+.volume-slider-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: var(--accent-color);
+    border-radius: 999px;
+    transition: height 0.06s linear;
+}
+
+.volume-slider-thumb {
+    position: absolute;
+    left: 50%;
+    transform: translate(-50%, 50%);
+    width: 1.05rem;
+    height: 1.05rem;
+    border-radius: 50%;
+    background: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+    transition: transform 0.2s var(--ease-spring), bottom 0.06s linear;
+}
+
+.volume-slider-track-wrapper.is-dragging .volume-slider-thumb,
+.volume-slider-track-wrapper:active .volume-slider-thumb {
+    transform: translate(-50%, 50%) scale(1.25);
+}
+
+.volume-mute-toggle {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--on-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 0.2s var(--ease-spring), background-color 0.2s ease, color 0.2s ease;
+}
+
+.volume-mute-toggle:active {
+    transform: scale(0.88);
+}
+
+.volume-mute-toggle .mute-slash {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.volume-mute-toggle.is-muted {
+    color: var(--danger-color);
+    background: rgba(196, 72, 72, 0.2);
+}
+
+.volume-mute-toggle.is-muted .mute-slash {
+    opacity: 1;
+}
+
+/* Popover de Acceso Rápido a Capítulos */
+.reader-chapters-popover {
+    position: absolute;
+    top: calc(100% + 0.85rem);
+    right: -2.6rem;
+    width: min(18.5rem, calc(100vw - 2rem));
+    padding: 0.9rem;
+    border-radius: 1.35rem;
+    background: rgba(34, 43, 52, 0.94);
+    border-top: var(--glass-border-top);
+    border-left: var(--glass-border-left);
+    border-bottom: var(--glass-border-bottom);
+    border-right: var(--glass-border-right);
+    box-shadow: var(--glass-glow), 0 16px 36px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    z-index: 250;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-8px) scale(0.92);
+    transform-origin: top right;
+    transition: opacity 0.22s ease, transform 0.28s var(--ease-spring), visibility 0.22s ease;
+}
+
+.reader-chapters-popover.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+}
+
+.chapters-popover-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.25rem 0.45rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.chapters-popover-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--on-surface);
+}
+
+.chapters-popover-badge {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.18rem 0.5rem;
+    border-radius: 999px;
+}
+
+.chapters-popover-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.chapter-quick-item {
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 0.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 0.2s var(--ease-spring), background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.chapter-quick-item:active {
+    transform: scale(0.96) translateZ(0);
+}
+
+.chapter-quick-item.is-active {
+    background: rgba(114, 140, 166, 0.28);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.chapter-quick-item.is-locked {
+    opacity: 0.78;
+}
+
+.chapter-quick-number {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.6rem;
+    background: rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    flex-shrink: 0;
+}
+
+.chapter-quick-item.is-active .chapter-quick-number {
+    background: var(--accent-color);
+}
+
+.chapter-quick-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.chapter-quick-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chapter-quick-status {
+    font-size: 0.73rem;
+    color: var(--on-surface);
+    opacity: 0.85;
+}
+
+.chapter-quick-status.status-active {
+    color: var(--like-color);
+    font-weight: 600;
+    opacity: 1;
+}
+
+.chapter-quick-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--like-color);
+    box-shadow: 0 0 8px var(--like-color);
+    flex-shrink: 0;
+}
+
+.chapter-lock-icon {
+    width: 1rem;
+    height: 1rem;
+    color: var(--on-surface);
+    opacity: 0.7;
+    flex-shrink: 0;
+}
+
+.chapters-popover-toast {
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #FFB4B4;
+    background: rgba(196, 72, 72, 0.22);
+    border: 1px solid rgba(255, 120, 120, 0.32);
+    border-radius: 0.75rem;
+    padding: 0.45rem 0.65rem;
+    text-align: center;
+    display: none;
+}
+
+.chapters-popover-toast.is-visible {
+    display: block;
+    animation: fadeInToast 0.2s var(--ease-spring);
+}
+
+@keyframes fadeInToast {
+    from {
+        opacity: 0;
+        transform: translateY(-4px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* HUD Dinámico Inmersivo del Lector (Ocultar al deslizar / Mostrar al tocar) */
+.reader-header {
+    will-change: transform, opacity;
+    transition: transform 0.36s var(--ease-smooth), opacity 0.28s ease;
+}
+
+.reader-header.hud-hidden {
+    transform: translateY(-115%) translateZ(0);
+    opacity: 0;
+    pointer-events: none;
+}
+
+#down-bar.hud-hidden {
+    transform: translateY(115%) translateZ(0);
+    opacity: 0;
+    pointer-events: none;
+}
+
+#visor {
+    cursor: pointer;
+}
+
 /* Accesibilidad: Respetar preferencia de reducción de movimiento */
 @media (prefers-reduced-motion: reduce) {
 
