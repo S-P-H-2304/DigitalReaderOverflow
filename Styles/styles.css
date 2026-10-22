@@ -592,12 +592,13 @@ a {
 }
 
 .cta-button {
-    padding: 0.5rem 1rem;
+    padding: 1rem 1.5rem;
     border-radius: 2rem;
     background-color: var(--button-bg);
     color: var(--text-primary);
     text-decoration: none;
-    font-size: 1.5rem;
+    font-size: 1.3rem;
+    font-weight: 600;
     border-top: var(--glass-border-top);
     border-left: var(--glass-border-left);
     border-bottom: var(--glass-border-bottom);
