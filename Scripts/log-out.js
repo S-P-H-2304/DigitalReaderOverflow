@@ -43,17 +43,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
-    // 4. ACCIÓN DE CERRAR SESIÓN
+    // 4. ACCIÓN DE CERRAR SESIÓN REAL EN FIREBASE
     if (btnConfirmar) {
-        btnConfirmar.addEventListener('click', () => {
+        btnConfirmar.addEventListener('click', async () => {
             backdrop.classList.remove('active');
-            // Redirigir a inicio
-            window.location.href = 'index.html';
+            if (window.DB && window.DB.logout) {
+                await window.DB.logout();
+            } else {
+                window.location.href = 'index.html';
+            }
         });
     }
 
     // ==========================================
-    // 5. POP-UP PARA EDITAR DATOS (NOMBRE, CORREO, CONTRASEÑA, ETC.)
+    // 5. POP-UP PARA EDITAR DATOS (USERNAME, BIO, NOMBRE, CORREO, CONTRASEÑA)
     // ==========================================
     const editBackdrop = document.getElementById('edit-backdrop');
     const editTitle = document.getElementById('edit-field-title');
@@ -62,6 +65,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     const btnGuardarEdit = document.getElementById('btn-guardar-edit');
 
     const fieldConfig = {
+        'username': {
+            title: 'Editar Username',
+            type: 'text',
+            placeholder: 'Ingresa tu @username'
+        },
+        'bio': {
+            title: 'Editar Descripción',
+            type: 'text',
+            placeholder: 'Cuéntanos sobre ti'
+        },
         'nombres': {
             title: 'Editar Nombres',
             type: 'text',
@@ -87,11 +100,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     let currentEditingKey = null;
     let currentTargetP = null;
 
-    // Cargar datos reales desde DB (LocalStorage)
+    // Verificar autenticación con Google y cargar datos reales desde Cloud Firestore
     if (window.DB) {
-        const user = await window.DB.getProfile();
+        const user = await window.DB.requireAuth();
         if (user) {
-            if (userPic && user.avatar) userPic.src = user.avatar;
+            if (userPic && user.avatar) {
+                userPic.referrerPolicy = 'no-referrer';
+                userPic.src = user.avatar;
+            }
             if (userHeader && user.username) userHeader.textContent = user.username;
             if (notificationsToggle && typeof user.notificationsEnabled === 'boolean') {
                 notificationsToggle.checked = user.notificationsEnabled;
@@ -178,6 +194,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                     currentTargetP.textContent = '•'.repeat(Math.max(6, nuevoValor.length));
                 } else {
                     currentTargetP.textContent = nuevoValor;
+                }
+
+                if (currentEditingKey === 'username' && userHeader) {
+                    userHeader.textContent = nuevoValor;
                 }
 
                 if (window.DB) {

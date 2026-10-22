@@ -51,10 +51,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!window.DB) return;
 
-    // --- 2. CARGA DE DATOS DE PERFIL ---
-    const currentUser = await window.DB.getProfile();
+    // --- 2. VERIFICACIÓN DE SESIÓN Y CARGA DE PERFIL EN LA NUBE ---
+    const currentUser = await window.DB.requireAuth();
     if (currentUser) {
-        if (profileAvatar && currentUser.avatar) profileAvatar.src = currentUser.avatar;
+        if (profileAvatar && currentUser.avatar) {
+            profileAvatar.referrerPolicy = 'no-referrer';
+            profileAvatar.src = currentUser.avatar;
+        }
         if (profileBanner && currentUser.banner) profileBanner.src = currentUser.banner;
         if (profileUsername) profileUsername.textContent = currentUser.username;
         if (profileBio) profileBio.textContent = currentUser.bio || '';
@@ -196,7 +199,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             return `
                 <article class="community-card-cta-container post-card" data-post-id="${post.id}">
                     <div class="community-card-cta-header">
-                        <img class="community-card-profile-icon" src="${post.authorAvatar || 'Images/Maclovin.png'}" alt="${post.authorUsername}" style="border-radius: 50%; object-fit: cover;">
+                        <img class="community-card-profile-icon" src="${post.authorAvatar || 'Images/default-avatar.svg'}" alt="${post.authorUsername}" referrerpolicy="no-referrer" style="border-radius: 50%; object-fit: cover;">
                         <span class="post-username-text" style="font-weight: bold;">${post.authorUsername}</span>
                         <div class="dot"></div>
                         <span class="post-time-text">${timeStr}</span>
@@ -348,7 +351,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         commentsList.innerHTML = comments.map(c => `
             <div class="comment-item">
-                <img class="comment-avatar" src="${c.authorAvatar || 'Images/Maclovin.png'}" alt="${c.authorUsername}">
+                <img class="comment-avatar" src="${c.authorAvatar || 'Images/default-avatar.svg'}" alt="${c.authorUsername}" referrerpolicy="no-referrer">
                 <div class="comment-content-box">
                     <div class="comment-author-row">
                         <span class="comment-author-name">${c.authorUsername}</span>
@@ -419,6 +422,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (e.key === 'Escape' && commentsBackdrop && commentsBackdrop.classList.contains('active')) {
             closeCommentsModal();
         }
+    });
+
+    window.addEventListener('overflow:posts-synced', () => {
+        renderProfileFeed();
     });
 
     // Render inicial

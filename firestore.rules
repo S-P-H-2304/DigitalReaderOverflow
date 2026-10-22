@@ -1,0 +1,267 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// This security rules file assumes the following data structures:
+//
+// Collection: users
+// Document ID: {userId} (Firebase Auth UID or seed IDs: 'user_mclovin', 'user_other')
+// Fields:
+//   - id: string (required, immutable, max 128 chars) - Document / User ID
+//   - username: string (required, 1..60 chars) - Display username
+//   - nombres: string (optional, 0..100 chars) - First name(s)
+//   - apellidos: string (optional, 0..100 chars) - Last name(s)
+//   - email: string (optional, 0..254 chars) - User email address
+//   - password: string (optional, 0..100 chars) - Masked password placeholder
+//   - bio: string (optional, 0..1000 chars) - Profile biography
+//   - avatar: string (optional, 0..800000 chars) - Avatar image path, URL, or compressed Base64 data URL
+//   - banner: string (optional, 0..800000 chars) - Banner image path, URL, or compressed Base64 data URL
+//   - activeChapter: string (optional, 0..20 chars) - Active chapter theme ID
+//   - notificationsEnabled: bool (optional) - Notification preference toggle
+//   - followersCount: number (optional, >= 0) - Number of followers
+//   - followingCount: number (optional, >= 0) - Number of followed users
+//   - following: list of strings (optional, max 2000 items) - IDs of users followed
+//   - reposts: list of strings (optional, max 2000 items) - IDs of reposted posts
+//   - createdAt: number (optional, >= 0) - Creation timestamp in milliseconds
+//
+// Collection: posts
+// Document ID: {postId} (e.g., 'post_1001', 'post_1002', or generated ID)
+// Fields:
+//   - id: string (required, immutable, max 128 chars) - Post ID
+//   - authorId: string (required, immutable, max 128 chars) - UID of the post author
+//   - authorUsername: string (required, 1..60 chars) - Denormalized username of the author
+//   - authorAvatar: string (optional, 0..800000 chars) - Denormalized avatar of the author
+//   - createdAt: number (required, immutable, >= 0) - Creation timestamp in milliseconds
+//   - content: string (required, 0..5000 chars) - Text content of the post
+//   - media: map or null (optional, keys: ['type', 'url']) - Attached image or GIF
+//   - likes: list of strings (required, max 5000 items) - User IDs who liked the post
+//   - dislikes: list of strings (required, max 5000 items) - User IDs who disliked the post
+//   - reposts: list of strings (required, max 5000 items) - User IDs who reposted the post
+//   - comments: list of maps (required, max 1000 items) - Embedded comment objects
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if user owns the resource (for user-owned documents)
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Check if user is owner based on document's authorId field
+    function isPostAuthor() {
+      return isAuthenticated() && resource.data.authorId == request.auth.uid;
+    }
+
+    // Verify id hasn't been tampered with on create
+    function idMatchesPath(docId) {
+      return !('id' in request.resource.data) || request.resource.data.id == docId;
+    }
+
+    // Ensure id field is not modified on update
+    function idNotModified() {
+      return !('id' in request.resource.data) ||
+             !('id' in resource.data) ||
+             request.resource.data.id == resource.data.id;
+    }
+
+    // Validate required fields exist
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // Validate that the document contains only the allowed fields
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Validate that immutable fields have not changed on update
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // Validate optional string (if present, must be string and within length)
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             request.resource.data[field] == null ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+
+    // Validate optional non-negative number
+    function isValidOptionalNonNegativeNumber(field) {
+      return !(field in request.resource.data) ||
+             ((request.resource.data[field] is int || request.resource.data[field] is float) &&
+              request.resource.data[field] >= 0 &&
+              request.resource.data[field] <= 9999999999999);
+    }
+
+    // Validate optional boolean
+    function isValidOptionalBool(field) {
+      return !(field in request.resource.data) ||
+             request.resource.data[field] is bool;
+    }
+
+    // Validate optional list with max size and basic element type check
+    function isValidOptionalStringList(field, maxSize) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is list &&
+              request.resource.data[field].size() <= maxSize &&
+              (request.resource.data[field].size() == 0 ||
+               (request.resource.data[field][0] is string &&
+                request.resource.data[field][0].size() <= 128)));
+    }
+
+    // Validate post media attachment (null or map with 'type' and 'url')
+    function isValidMedia(media) {
+      return media == null ||
+             (media is map &&
+              media.keys().hasOnly(['type', 'url']) &&
+              media.type in ['image', 'gif'] &&
+              media.url is string &&
+              media.url.size() > 0 &&
+              media.url.size() <= 800000);
+    }
+
+    // Validate comments list in posts
+    function isValidCommentsList(comments) {
+      return comments is list &&
+             comments.size() <= 1000 &&
+             (comments.size() == 0 ||
+              (comments[comments.size() - 1] is map &&
+               comments[comments.size() - 1].keys().hasOnly(['id', 'authorId', 'authorUsername', 'authorAvatar', 'text', 'createdAt']) &&
+               comments[comments.size() - 1].id is string &&
+               comments[comments.size() - 1].id.size() <= 128 &&
+               comments[comments.size() - 1].authorId is string &&
+               comments[comments.size() - 1].authorId.size() <= 128 &&
+               comments[comments.size() - 1].authorUsername is string &&
+               comments[comments.size() - 1].authorUsername.size() <= 60 &&
+               comments[comments.size() - 1].text is string &&
+               comments[comments.size() - 1].text.size() >= 1 &&
+               comments[comments.size() - 1].text.size() <= 2000 &&
+               (comments[comments.size() - 1].createdAt is int || comments[comments.size() - 1].createdAt is float)));
+    }
+
+    // ===============================================================
+    // Domain Validators (Used in BOTH create and update)
+    // ===============================================================
+
+    function isValidUser(data, userId) {
+      let allowedFields = [
+        'id', 'username', 'nombres', 'apellidos', 'email', 'password',
+        'bio', 'avatar', 'banner', 'activeChapter', 'notificationsEnabled',
+        'followersCount', 'followingCount', 'following', 'reposts', 'createdAt'
+      ];
+      return hasOnlyAllowedFields(allowedFields) &&
+             hasRequiredFields(['id', 'username']) &&
+             idMatchesPath(userId) &&
+             data.id is string && data.id.size() >= 1 && data.id.size() <= 128 &&
+             data.username is string && data.username.size() >= 1 && data.username.size() <= 60 &&
+             isValidOptionalString('nombres', 0, 100) &&
+             isValidOptionalString('apellidos', 0, 100) &&
+             isValidOptionalString('email', 0, 254) &&
+             isValidOptionalString('password', 0, 100) &&
+             isValidOptionalString('bio', 0, 1000) &&
+             isValidOptionalString('avatar', 0, 800000) &&
+             isValidOptionalString('banner', 0, 800000) &&
+             isValidOptionalString('activeChapter', 0, 20) &&
+             isValidOptionalBool('notificationsEnabled') &&
+             isValidOptionalNonNegativeNumber('followersCount') &&
+             isValidOptionalNonNegativeNumber('followingCount') &&
+             isValidOptionalStringList('following', 2000) &&
+             isValidOptionalStringList('reposts', 2000) &&
+             isValidOptionalNonNegativeNumber('createdAt');
+    }
+
+    function isValidPost(data, postId) {
+      let allowedFields = [
+        'id', 'authorId', 'authorUsername', 'authorAvatar', 'createdAt',
+        'content', 'media', 'likes', 'dislikes', 'reposts', 'comments'
+      ];
+      return hasOnlyAllowedFields(allowedFields) &&
+             hasRequiredFields(['id', 'authorId', 'authorUsername', 'createdAt', 'content', 'likes', 'dislikes', 'reposts', 'comments']) &&
+             idMatchesPath(postId) &&
+             data.id is string && data.id.size() >= 1 && data.id.size() <= 128 &&
+             data.authorId is string && data.authorId.size() >= 1 && data.authorId.size() <= 128 &&
+             data.authorUsername is string && data.authorUsername.size() >= 1 && data.authorUsername.size() <= 60 &&
+             isValidOptionalString('authorAvatar', 0, 800000) &&
+             (data.createdAt is int || data.createdAt is float) && data.createdAt >= 0 &&
+             data.content is string && data.content.size() <= 5000 &&
+             (!('media' in data) || isValidMedia(data.media)) &&
+             isValidOptionalStringList('likes', 5000) &&
+             isValidOptionalStringList('dislikes', 5000) &&
+             isValidOptionalStringList('reposts', 5000) &&
+             isValidCommentsList(data.comments);
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Public read access so profiles (myprofile.html, otherprofile.html) and seed users can be viewed
+      allow read: if true;
+
+      // Allowed if authenticated and creating own profile OR seeding initial demo users
+      allow create: if isAuthenticated() &&
+                       isValidUser(request.resource.data, userId) &&
+                       (isOwner(userId) || userId in ['user_other', 'user_mclovin']);
+
+      // Owner can update their own profile fields; other authenticated users can update followersCount when following/unfollowing
+      allow update: if isAuthenticated() &&
+                       isValidUser(request.resource.data, userId) &&
+                       idNotModified() &&
+                       areImmutableFieldsUnchanged(['id', 'createdAt']) &&
+                       (
+                         isOwner(userId) ||
+                         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followersCount']) &&
+                          math.abs(request.resource.data.followersCount - resource.data.followersCount) <= 1)
+                       );
+
+      allow delete: if false;
+    }
+
+    match /posts/{postId} {
+      // Public read access so the community feed can be read
+      allow read: if true;
+
+      // Allowed if authenticated where authorId matches auth UID, or seeding initial demo posts
+      allow create: if isAuthenticated() &&
+                       isValidPost(request.resource.data, postId) &&
+                       (request.resource.data.authorId == request.auth.uid ||
+                        postId in ['post_1001', 'post_1002']);
+
+      // Any authenticated user can update reaction/comment lists, OR post author can update content/author metadata
+      allow update: if isAuthenticated() &&
+                       isValidPost(request.resource.data, postId) &&
+                       idNotModified() &&
+                       areImmutableFieldsUnchanged(['id', 'authorId', 'createdAt']) &&
+                       (
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'dislikes', 'reposts', 'comments']) ||
+                         (isPostAuthor() &&
+                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['authorUsername', 'authorAvatar', 'content', 'media', 'likes', 'dislikes', 'reposts', 'comments']))
+                       );
+
+      // Only the post author can delete their post
+      allow delete: if isPostAuthor();
+    }
+
+    // Default deny for all other collections and paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

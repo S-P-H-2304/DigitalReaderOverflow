@@ -18,8 +18,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!window.DB) return;
 
-    // --- 1. REFERENCIAS DE ELEMENTOS ---
-    const TARGET_USER_ID = 'user_other';
+    // --- 1. REFERENCIAS DE ELEMENTOS Y UID DINÁMICO ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const TARGET_USER_ID = urlParams.get('uid') || 'user_other';
     const otherAvatar = document.getElementById('other-avatar');
     const otherBanner = document.getElementById('other-banner');
     const otherUsername = document.getElementById('other-username');
@@ -45,13 +46,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentTab = 'posts';
     let activeCommentPostId = null;
 
-    // --- 2. CARGAR PERFIL DE USUARIO VISITADO ---
+    // --- 2. CARGAR PERFIL DE USUARIO VISITADO DESDE FIRESTORE ---
     async function loadTargetProfile() {
+        const currentUser = await window.DB.requireAuth();
+        if (currentUser && currentUser.id === TARGET_USER_ID) {
+            window.location.href = 'myprofile.html';
+            return;
+        }
         const targetUser = await window.DB.getProfile(TARGET_USER_ID);
-        const currentUser = await window.DB.getProfile();
 
         if (targetUser) {
-            if (otherAvatar && targetUser.avatar) otherAvatar.src = targetUser.avatar;
+            if (otherAvatar && targetUser.avatar) {
+                otherAvatar.referrerPolicy = 'no-referrer';
+                otherAvatar.src = targetUser.avatar;
+            }
             if (otherBanner && targetUser.banner) otherBanner.src = targetUser.banner;
             if (otherUsername) otherUsername.textContent = targetUser.username;
             if (otherBio) otherBio.textContent = targetUser.bio || '';
@@ -186,7 +194,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             return `
                 <article class="community-card-cta-container post-card" data-post-id="${post.id}">
                     <div class="community-card-cta-header">
-                        <img class="community-card-profile-icon" src="${post.authorAvatar || 'Images/Maclovin.png'}" alt="${post.authorUsername}" style="border-radius: 50%; object-fit: cover;">
+                        <img class="community-card-profile-icon" src="${post.authorAvatar || 'Images/default-avatar.svg'}" alt="${post.authorUsername}" referrerpolicy="no-referrer" style="border-radius: 50%; object-fit: cover;">
                         <span class="post-username-text" style="font-weight: bold;">${post.authorUsername}</span>
                         <div class="dot"></div>
                         <span class="post-time-text">${timeStr}</span>
@@ -334,7 +342,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         commentsList.innerHTML = comments.map(c => `
             <div class="comment-item">
-                <img class="comment-avatar" src="${c.authorAvatar || 'Images/Maclovin.png'}" alt="${c.authorUsername}">
+                <img class="comment-avatar" src="${c.authorAvatar || 'Images/default-avatar.svg'}" alt="${c.authorUsername}" referrerpolicy="no-referrer">
                 <div class="comment-content-box">
                     <div class="comment-author-row">
                         <span class="comment-author-name">${c.authorUsername}</span>
@@ -405,6 +413,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (e.key === 'Escape' && commentsBackdrop && commentsBackdrop.classList.contains('active')) {
             closeCommentsModal();
         }
+    });
+
+    window.addEventListener('overflow:posts-synced', () => {
+        renderProfileFeed();
     });
 
     // Carga inicial

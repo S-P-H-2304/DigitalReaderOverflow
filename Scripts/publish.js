@@ -31,10 +31,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     let currentAttachedMedia = null; // { type: 'image' | 'gif', url: string }
     let activeCommentPostId = null;
 
-    // Cargar avatar del usuario activo en el overlay
-    if (window.DB && publishUserAvatar) {
-        const currentUser = await window.DB.getProfile();
-        if (currentUser && currentUser.avatar) {
+    // Verificar sesión con Google y cargar avatar del usuario activo en el overlay
+    if (window.DB) {
+        const currentUser = await window.DB.requireAuth();
+        if (currentUser && publishUserAvatar && currentUser.avatar) {
+            publishUserAvatar.referrerPolicy = 'no-referrer';
             publishUserAvatar.src = currentUser.avatar;
         }
     }
@@ -85,8 +86,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             const repostsCount = Array.isArray(post.reposts) ? post.reposts.length : 0;
             const timeStr = window.DB.timeAgo(post.createdAt);
 
-            // Perfil link: si es currentUser va a myprofile.html, si es otro va a otherprofile.html
-            const profileLink = (post.authorId === currentUserId) ? 'myprofile.html' : 'otherprofile.html';
+            // Perfil link: si es currentUser va a myprofile.html, si es otro va a otherprofile.html?uid=...
+            const profileLink = (post.authorId === currentUserId)
+                ? 'myprofile.html'
+                : `otherprofile.html?uid=${encodeURIComponent(post.authorId)}`;
 
             // Media HTML
             let mediaHtml = '';
@@ -102,7 +105,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <article class="community-card-cta-container post-card" data-post-id="${post.id}">
                     <div class="community-card-cta-header">
                         <a href="${profileLink}" class="post-author-link">
-                            <img class="community-card-profile-icon" src="${post.authorAvatar || 'Images/Maclovin.png'}" alt="${post.authorUsername}" style="border-radius: 50%; object-fit: cover;">
+                            <img class="community-card-profile-icon" src="${post.authorAvatar || 'Images/default-avatar.svg'}" alt="${post.authorUsername}" referrerpolicy="no-referrer" style="border-radius: 50%; object-fit: cover;">
                         </a>
                         <a href="${profileLink}" class="post-author-name">
                             <span class="post-username-text">${post.authorUsername}</span>
@@ -264,7 +267,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         commentsList.innerHTML = comments.map(c => `
             <div class="comment-item">
-                <img class="comment-avatar" src="${c.authorAvatar || 'Images/Maclovin.png'}" alt="${c.authorUsername}">
+                <img class="comment-avatar" src="${c.authorAvatar || 'Images/default-avatar.svg'}" alt="${c.authorUsername}" referrerpolicy="no-referrer">
                 <div class="comment-content-box">
                     <div class="comment-author-row">
                         <span class="comment-author-name">${c.authorUsername}</span>
@@ -447,6 +450,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                 closePublishOverlay();
             }
         }
+    });
+
+    window.addEventListener('overflow:posts-synced', () => {
+        renderFeed();
     });
 
     // Render inicial
