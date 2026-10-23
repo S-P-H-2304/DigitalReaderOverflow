@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // =========================================================================
-    // 2. BOTÓN DE LIKE GLOBAL DEL CAPÍTULO + ANIMACIÓN DE CORAZÓN (ABAJO)
+    // 2. BOTÓN DE LIKE GLOBAL DEL CAPÍTULO, VISTAS Y PROGRESO EN FIRESTORE
     // =========================================================================
     const likesInteraction = document.getElementById('likes-interaction');
     const likeBtn = document.getElementById('btn-chapter-like')
@@ -68,7 +68,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (window.DB) {
-        const initialStats = await window.DB.getChapterStats('chapter_1');
+        // Registrar visualización del capítulo en Firestore y obtener estadísticas actuales
+        const initialStats = await window.DB.incrementChapterView('chapter_1');
         if (initialStats) {
             applyChapterLikeState(initialStats.likesCount, initialStats.hasLiked);
         }
@@ -82,6 +83,32 @@ document.addEventListener('DOMContentLoaded', async () => {
                 applyChapterLikeState(ch.likesCount ?? 1200, hasLiked);
             }
         });
+    }
+
+    // Seguimiento de paneles leídos para actualizar progreso en Firestore
+    if (visor && window.DB) {
+        const panels = Array.from(visor.querySelectorAll('.page-container'));
+        const totalPanels = panels.length || 12;
+
+        const updateReadingProgress = () => {
+            if (!panels.length) return;
+            const viewportBottom = visor.scrollTop + visor.clientHeight;
+            let readCount = 1;
+            panels.forEach((panel, idx) => {
+                const panelMid = panel.offsetTop + (panel.offsetHeight * 0.35);
+                if (viewportBottom >= panelMid) {
+                    readCount = idx + 1;
+                }
+            });
+            if (visor.scrollTop + visor.clientHeight >= visor.scrollHeight - 40) {
+                readCount = totalPanels;
+            }
+            window.DB.saveChapterProgress('chapter_1', readCount, totalPanels);
+        };
+
+        // Registrar primer panel al abrir
+        updateReadingProgress();
+        visor.addEventListener('scroll', updateReadingProgress, { passive: true });
     }
 
     if (likeBtn) {
@@ -373,7 +400,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         let lastScrollTop = visor.scrollTop;
         let scrollTicking = false;
 
-        // Ocultar barras automáticamente mientras el usuario desliza la tira
         visor.addEventListener('scroll', () => {
             if (scrollTicking) return;
             scrollTicking = true;
@@ -391,7 +417,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }, { passive: true });
 
-        // Detectar toque limpio (tap) en el visor para mostrar/ocultar el menú
         let pointerStartX = 0;
         let pointerStartY = 0;
         let pointerStartTime = 0;

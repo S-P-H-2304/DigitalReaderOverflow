@@ -151,8 +151,8 @@ a {
 
 .header {
     display: flex;
-    padding: calc(1.2rem + var(--safe-top)) 1rem 1.2rem;
-    margin-bottom: -1.4rem;
+    padding: min(calc(0.65rem + var(--safe-top)), 1.35rem) 1rem 0.6rem;
+    margin-bottom: 0;
     justify-content: space-between;
     align-items: center;
 }
@@ -172,19 +172,23 @@ a {
 }
 
 .reader-container {
+    --carousel-gap: clamp(0.75rem, 1.8vh, 1.25rem);
     display: flex;
     flex-direction: column;
+    justify-content: center;
     overflow: hidden;
-    padding: 2.3rem 1.8rem 2.5rem;
-    gap: 3.5rem;
+    height: calc(100vh - (min(calc(0.65rem + var(--safe-top)), 1.35rem) + 3.1rem));
+    height: calc(100dvh - (min(calc(0.65rem + var(--safe-top)), 1.35rem) + 3.1rem));
+    padding: var(--carousel-gap) 1.8rem calc(6rem + var(--safe-bottom) + var(--carousel-gap));
+    box-sizing: border-box;
 }
 
 .chapter-carousel {
     display: flex;
     position: relative;
     width: 100%;
-    height: 70vh;
-    height: 70dvh;
+    flex: 1;
+    height: 100%;
     touch-action: pan-y;
     user-select: none;
     -webkit-user-select: none;
@@ -203,8 +207,7 @@ a {
 
 .chapter-card-active {
     width: 100%;
-    height: 70vh;
-    height: 70dvh;
+    height: 100%;
     transform: translate(-50%, -50%) scale(1);
     z-index: 2;
     opacity: 1;
@@ -212,8 +215,7 @@ a {
 
 .chapter-card-prev {
     width: 68vw;
-    height: 55vh;
-    height: 55dvh;
+    height: 78%;
     transform: translate(calc(-50% - 75vw), -50%) scale(0.88);
     z-index: 1;
     opacity: 0.6;
@@ -221,8 +223,7 @@ a {
 
 .chapter-card-next {
     width: 68vw;
-    height: 55vh;
-    height: 55dvh;
+    height: 78%;
     transform: translate(calc(-50% + 75vw), -50%) scale(0.88);
     z-index: 1;
     opacity: 0.6;
@@ -230,8 +231,7 @@ a {
 
 .chapter-card-hidden {
     width: 68vw;
-    height: 55vh;
-    height: 55dvh;
+    height: 78%;
     transform: translate(-50%, -50%) scale(0.7);
     z-index: 0;
     opacity: 0;
@@ -468,7 +468,7 @@ a {
 .chapter-overview-container {
     display: flex;
     flex-direction: column;
-    padding: 2.4rem 1.8rem;
+    padding: clamp(0.5rem, 1.8vh, 1.2rem) 1.8rem 2rem;
 }
 
 .chapter-overview {
@@ -611,8 +611,8 @@ a {
 .community-container {
     display: flex;
     flex-direction: column;
-    padding: 2.4rem 1.8rem 7.5rem;
-    gap: 2rem;
+    padding: clamp(0.5rem, 1.8vh, 1.2rem) 1.8rem 7.5rem;
+    gap: 1.5rem;
 }
 
 #community-feed,
@@ -807,14 +807,14 @@ a {
 .profile-container {
     display: flex;
     flex-direction: column;
-    padding: 2.4rem 1.8rem 7.5rem;
-    gap: 2rem;
+    padding: clamp(0.5rem, 1.8vh, 1.2rem) 1.8rem 7.5rem;
+    gap: 1.6rem;
 }
 
 .banner-info-container {
     display: flex;
     flex-direction: column;
-    gap: 2rem;
+    gap: 1.5rem;
 }
 
 .banner-container {
@@ -844,11 +844,109 @@ a {
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
 
+.avatar-edit-wrapper {
+    position: absolute;
+    top: 62%;
+    left: 1.5rem;
+    width: 6rem;
+    height: 6rem;
+    z-index: 2;
+}
+
+.avatar-edit-wrapper .profile-pic {
+    position: relative;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.photo-edit-badge {
+    position: absolute;
+    width: 2.3rem;
+    height: 2.3rem;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.45);
+    background: rgba(20, 28, 36, 0.88);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 4;
+    opacity: 0;
+    transform: scale(0.5);
+    pointer-events: none;
+    cursor: pointer;
+    transition: opacity 0.25s ease, transform 0.3s var(--ease-spring), background-color 0.2s ease;
+}
+
+.photo-edit-badge svg {
+    width: 1.15rem;
+    height: 1.15rem;
+}
+
+.banner-edit-badge,
+.photo-edit-badge-banner {
+    bottom: 0.85rem;
+    right: 0.85rem;
+    width: auto;
+    height: auto;
+    padding: 0.45rem 0.85rem;
+    border-radius: 999px;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.avatar-edit-badge,
+.photo-edit-badge-avatar {
+    bottom: -0.15rem;
+    right: -0.15rem;
+    width: 2.1rem;
+    height: 2.1rem;
+}
+
+.profile-container.is-editing-photos .photo-edit-badge {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+}
+
+.profile-container.is-editing-photos .banner-img,
+.profile-container.is-editing-photos .profile-pic {
+    outline: 2px dashed rgba(255, 255, 255, 0.65);
+    outline-offset: 2px;
+    filter: brightness(0.92);
+}
+
+.profile-edit-mode-hint {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #ffffff;
+    background: rgba(46, 213, 115, 0.18);
+    border: 1px solid rgba(46, 213, 115, 0.45);
+    border-radius: 999px;
+    padding: 0.45rem 0.9rem;
+    margin-bottom: -0.5rem;
+}
+
+.profile-container.is-editing-photos .profile-edit-mode-hint {
+    display: flex;
+}
+
 .profile-info {
     display: flex;
     flex-direction: column;
     gap: 1rem;
     width: 100%;
+    min-width: 0;
 }
 
 .follow-container {
@@ -860,8 +958,23 @@ a {
 .profile-description {
     display: flex;
     flex-direction: column;
-    padding-right: 15%;
-    gap: 0.5rem;
+    padding-right: 0.5rem;
+    gap: 0.65rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.profile-description p,
+#profile-bio,
+#other-bio {
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.45;
 }
 
 .follow-button {
@@ -959,14 +1072,28 @@ a {
     border-radius: 50%;
     border: none;
     margin-right: 1rem;
+    background-color: var(--button-bg);
+    color: var(--text-primary);
+    border-top: var(--glass-border-top);
+    border-left: var(--glass-border-left);
+    border-bottom: var(--glass-border-bottom);
+    border-right: var(--glass-border-right);
+    box-shadow: var(--glass-glow), 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+#edit-profile.active-edit-mode {
+    background-color: var(--like-color, #2ed573);
+    color: #0e161d;
+    box-shadow: 0 0 16px rgba(46, 213, 115, 0.45);
 }
 
 .settings-container {
     display: flex;
     flex-direction: column;
-    justify-content: space-around;
+    justify-content: flex-start;
+    gap: clamp(0.75rem, 1.8vh, 1.2rem);
     padding: 0.2rem 1.6rem calc(1rem + var(--safe-bottom));
-    min-height: calc(100dvh - 4.8rem);
+    min-height: calc(100dvh - 4rem);
     box-sizing: border-box;
 }
 
@@ -975,7 +1102,7 @@ a {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.2rem;
 }
 
 .profile-info-settings-pic-name {
@@ -983,16 +1110,22 @@ a {
     flex-direction: column;
     align-items: center;
     gap: 0.35rem;
+    max-width: 100%;
 }
 
 .profile-info-settings-pic-name h1 {
-    font-size: 3rem;
+    font-size: clamp(1.75rem, 6.2vw, 2.4rem);
     margin: 0;
+    max-width: 88vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
 }
 
 .profile-settings-pic {
-    width: 6rem;
-    height: 6rem;
+    width: 5.5rem;
+    height: 5.5rem;
     border-radius: 50%;
     object-fit: cover;
 }
@@ -1000,42 +1133,52 @@ a {
 .settings-panels {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
-    margin-bottom: 0.5rem;
+    gap: 1.15rem;
+    margin-bottom: 0.25rem;
 }
 
 #gap-settings {
-    gap: 1.8rem;
-    padding: 0.75rem 1.1rem;
+    gap: 1.35rem;
+    padding: 0.85rem 1.1rem;
 }
 
 .settings-panels-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 0.85rem;
+    min-width: 0;
 }
 
 .settings-panels-content h2 {
-    font-size: 1.2rem;
+    font-size: 1.08rem;
     color: var(--text-primary);
     margin: 0;
+    flex-shrink: 0;
 }
 
 .settings-panels-content p {
-    font-size: 1rem;
+    font-size: 0.94rem;
     color: var(--on-surface);
     margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .settings-icon-container {
     display: flex;
-    gap: 0.75rem;
+    gap: 0.65rem;
     align-items: center;
+    min-width: 0;
+    max-width: 62%;
+    justify-content: flex-end;
 }
 
 .settings-icon {
     width: 0.4rem;
     height: 0.7rem;
+    flex-shrink: 0;
 }
 
 #margin-icon {
@@ -1100,7 +1243,7 @@ a {
 
 .reader-header {
     display: flex;
-    padding: calc(1.2rem + var(--safe-top)) 1rem 1.2rem;
+    padding: min(calc(0.75rem + var(--safe-top)), 1.4rem) 1rem 0.9rem;
     justify-content: space-between;
     align-items: center;
     background: linear-gradient(to bottom, rgb(0, 0, 0), #007aff00);
@@ -1199,9 +1342,9 @@ a {
     border-right: var(--glass-border-right);
     box-shadow: var(--glass-glow), 0 4px 12px rgba(0, 0, 0, 0.1);
     height: auto;
-    width: calc(100% - 5rem);
+    width: calc(100% - 2.5rem);
     max-width: 400px;
-    padding: 3.5rem 2.5rem;
+    padding: 2.2rem 1.75rem;
     border-radius: 2rem;
     transform: scale(0.8);
     transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -1212,7 +1355,7 @@ a {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 3rem;
+    gap: 1.5rem;
 }
 
 .confirm-overlay-content h2 {
@@ -1293,6 +1436,9 @@ a {
 /* Modal de edición de campos */
 .edit-input-wrapper {
     width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
 }
 
 .edit-modal-input {
@@ -1314,6 +1460,35 @@ a {
     -webkit-backdrop-filter: blur(15px);
     backdrop-filter: blur(15px);
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.edit-modal-textarea {
+    min-height: 9rem;
+    line-height: 1.48;
+    resize: vertical;
+    border-radius: 1.15rem;
+    padding: 0.9rem 1.1rem;
+}
+
+.edit-bio-counter {
+    font-size: 0.78rem;
+    color: var(--on-surface);
+    opacity: 0.85;
+    text-align: right;
+    padding-right: 0.35rem;
+    margin-top: -0.35rem;
+}
+
+.edit-modal-error {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.35;
+    color: #FFB4B4;
+    background: rgba(196, 72, 72, 0.22);
+    border: 1px solid rgba(255, 120, 120, 0.38);
+    border-radius: 0.9rem;
+    padding: 0.55rem 0.85rem;
+    text-align: left;
 }
 
 .edit-modal-input:focus {
@@ -1909,19 +2084,19 @@ a,
     transition: transform 0.3s var(--ease-bounce);
 }
 
-/* 12. Modal Glassmorphism de Inicio de Sesión con Google (Firebase Auth) */
+/* 12. Modal Glassmorphism de Inicio de Sesión Dual (Usuario/Contraseña + Google) */
 .auth-modal-backdrop {
     position: fixed;
     inset: 0;
     width: 100vw;
     height: 100dvh;
-    background: rgba(10, 15, 22, 0.72);
+    background: rgba(10, 15, 22, 0.76);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 1.5rem;
+    padding: 1rem;
     z-index: 9999;
     opacity: 0;
     visibility: hidden;
@@ -1935,19 +2110,21 @@ a,
 
 .auth-modal-card {
     width: 100%;
-    max-width: 22rem;
-    background: var(--card-bg, rgba(47, 60, 70, 0.85));
+    max-width: 23.5rem;
+    max-height: 92dvh;
+    overflow-y: auto;
+    background: var(--card-bg, rgba(47, 60, 70, 0.92));
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 1.6rem;
-    padding: 2rem 1.5rem;
+    padding: 1.5rem 1.35rem;
     box-shadow: 0 20px 45px rgba(0, 0, 0, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.18);
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 1.1rem;
+    gap: 0.85rem;
     color: var(--on-surface, #D4DBE4);
     transform: scale(0.9) translateY(15px);
     transition: transform 0.35s var(--ease-spring);
@@ -1958,8 +2135,8 @@ a,
 }
 
 .auth-modal-logo-badge {
-    width: 3.8rem;
-    height: 3.8rem;
+    width: 3.2rem;
+    height: 3.2rem;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.22);
@@ -1967,11 +2144,12 @@ a,
     align-items: center;
     justify-content: center;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+    flex-shrink: 0;
 }
 
 .auth-modal-title {
     font-family: var(--font-main);
-    font-size: 1.35rem;
+    font-size: 1.25rem;
     font-weight: 700;
     color: #FFFFFF;
     margin: 0;
@@ -1979,28 +2157,162 @@ a,
 
 .auth-modal-subtitle {
     font-family: var(--font-main);
-    font-size: 0.92rem;
-    line-height: 1.45;
+    font-size: 0.86rem;
+    line-height: 1.4;
     color: var(--on-surface, #D4DBE4);
     opacity: 0.9;
     margin: 0;
 }
 
+.auth-tabs {
+    display: flex;
+    width: 100%;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 999px;
+    padding: 0.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.auth-tab-btn {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--on-surface, #D4DBE4);
+    font-family: var(--font-main);
+    font-size: 0.86rem;
+    font-weight: 600;
+    padding: 0.5rem 0.75rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.auth-tab-btn.active {
+    background: rgba(255, 255, 255, 0.16);
+    color: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.auth-form {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    text-align: left;
+}
+
+.auth-field-row {
+    display: flex;
+    gap: 0.6rem;
+    width: 100%;
+}
+
+.auth-field-row .auth-field-group {
+    flex: 1;
+    min-width: 0;
+}
+
+.auth-field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    width: 100%;
+}
+
+.auth-field-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary, #D4DBE4);
+    padding-left: 0.35rem;
+}
+
+.auth-input {
+    width: 100%;
+    padding: 0.68rem 0.9rem;
+    border-radius: 0.95rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    color: #FFFFFF;
+    font-family: var(--font-main);
+    font-size: 0.92rem;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.25s ease, background-color 0.25s ease;
+}
+
+.auth-input::placeholder {
+    color: rgba(255, 255, 255, 0.45);
+}
+
+.auth-input:focus {
+    border-color: var(--accent-color, #728CA6);
+    background: rgba(255, 255, 255, 0.13);
+}
+
+.btn-auth-primary {
+    width: 100%;
+    min-height: 2.95rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: var(--accent-color, #728CA6);
+    color: #FFFFFF;
+    font-family: var(--font-main);
+    font-size: 0.95rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.7rem 1.2rem;
+    margin-top: 0.2rem;
+    cursor: pointer;
+    touch-action: manipulation;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+    transition: transform 0.2s var(--ease-spring), filter 0.2s ease, opacity 0.2s ease;
+}
+
+.btn-auth-primary:active {
+    transform: scale(0.96) translateZ(0);
+    filter: brightness(1.1);
+}
+
+.btn-auth-primary:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}
+
+.auth-divider {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 0.75rem;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 0.78rem;
+    margin: 0.1rem 0;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.15);
+}
+
 .btn-google-login {
     width: 100%;
-    min-height: 3.1rem;
+    min-height: 2.95rem;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.35);
     background: #FFFFFF;
     color: #1F1F1F;
     font-family: var(--font-main);
-    font-size: 0.98rem;
+    font-size: 0.94rem;
     font-weight: 700;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1.25rem;
+    gap: 0.65rem;
+    padding: 0.65rem 1.15rem;
     cursor: pointer;
     touch-action: manipulation;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
@@ -2022,18 +2334,18 @@ a,
 
 .btn-auth-secondary {
     width: 100%;
-    min-height: 2.75rem;
+    min-height: 2.6rem;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.16);
     background: rgba(255, 255, 255, 0.07);
     color: var(--on-surface, #D4DBE4);
     font-family: var(--font-main);
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     font-weight: 600;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0.6rem 1rem;
+    padding: 0.55rem 1rem;
     cursor: pointer;
     touch-action: manipulation;
     transition: transform 0.2s var(--ease-spring), background-color 0.2s ease;
@@ -2053,8 +2365,73 @@ a,
     background: rgba(196, 72, 72, 0.22);
     border: 1px solid rgba(255, 120, 120, 0.35);
     border-radius: 0.85rem;
-    padding: 0.65rem 0.85rem;
+    padding: 0.6rem 0.85rem;
     display: none;
+}
+
+/* Lightbox de inspección de imágenes de perfil (Modo Normal) */
+.image-lightbox-backdrop {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    background: rgba(6, 10, 15, 0.88);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.28s ease, visibility 0.28s ease;
+}
+
+.image-lightbox-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.image-lightbox-img {
+    max-width: min(92vw, 34rem);
+    max-height: 80dvh;
+    border-radius: 1.4rem;
+    object-fit: contain;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    transform: scale(0.88);
+    transition: transform 0.32s var(--ease-spring);
+}
+
+.image-lightbox-backdrop.active .image-lightbox-img {
+    transform: scale(1);
+}
+
+.image-lightbox-close {
+    position: absolute;
+    top: calc(1.2rem + var(--safe-top));
+    right: 1.4rem;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.14);
+    color: #FFFFFF;
+    font-size: 1.65rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: transform 0.2s var(--ease-spring), background-color 0.2s ease;
+}
+
+.image-lightbox-close:active {
+    transform: scale(0.9);
+    background: rgba(255, 255, 255, 0.25);
 }
 
 /* ========================================================

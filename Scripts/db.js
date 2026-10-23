@@ -1,9 +1,8 @@
 /**
  * Overflow Database & Authentication Service (db.js)
- * Conectado a Firebase Authentication (Google Sign-In) y Cloud Firestore
+ * Conectado a Firebase Authentication (Google Sign-In + Cuentas propias Usuario/Contraseña) y Cloud Firestore
  * Proyecto: overflow-digital-reader
- * Optimizado con hidratación síncrona (0ms antes del primer pintado) + Stale-While-Revalidate
- * para eliminar cualquier parpadeo de placeholders o tardanza entre páginas.
+ * Optimizado con hidratación síncrona (0ms antes del primer pintado) + Real-time Cloud Sync
  */
 
 (function (window) {
@@ -28,13 +27,16 @@
     const DEFAULT_AVATAR = 'Images/default-avatar.svg';
     const DEFAULT_BANNER = 'Images/default-banner.svg';
     const DEFAULT_CURRENT_USER_ID = 'user_mclovin';
+    const TOTAL_CHAPTER_1_PANELS = 12;
 
     const SEED_CHAPTERS = {
         'chapter_1': {
             id: 'chapter_1',
             title: 'Capítulo 1: A la deriva',
             likes: ['user_other'],
-            likesCount: 1200
+            likesCount: 1200,
+            viewsCount: 2700,
+            totalPanels: TOTAL_CHAPTER_1_PANELS
         }
     };
 
@@ -46,16 +48,21 @@
             apellidos: 'Vega',
             email: 'alex@overflow.com',
             password: '••••••••',
+            authProvider: 'password',
+            usernameConfirmed: true,
             bio: 'Lector veterano del cómic Overflow y explorador de capítulos.',
             avatar: DEFAULT_AVATAR,
             banner: DEFAULT_BANNER,
+            customAvatar: false,
+            customBanner: false,
             activeChapter: '1',
             notificationsEnabled: true,
             volume: 80,
             followersCount: 322,
             followingCount: 540,
             following: [],
-            reposts: []
+            reposts: [],
+            chapterProgress: { chapter_1: 0 }
         },
         'user_other': {
             id: 'user_other',
@@ -64,16 +71,21 @@
             apellidos: 'Lector',
             email: 'carlos@overflow.com',
             password: '••••••••',
+            authProvider: 'password',
+            usernameConfirmed: true,
             bio: 'Fanático del cómic Overflow y coleccionista de viñetas.',
             avatar: DEFAULT_AVATAR,
             banner: DEFAULT_BANNER,
+            customAvatar: false,
+            customBanner: false,
             activeChapter: '1',
             notificationsEnabled: false,
             volume: 80,
             followersCount: 120,
             followingCount: 85,
             following: [],
-            reposts: []
+            reposts: [],
+            chapterProgress: { chapter_1: 12 }
         }
     };
 
@@ -135,18 +147,28 @@
         }
     }
 
-    // Limpia cualquier referencia antigua a Maclovin en el caché local
+    function isGoogleDefaultPhotoUrl(url) {
+        if (!url || typeof url !== 'string') return false;
+        return url.includes('googleusercontent.com') || url.includes('lh3.google.com');
+    }
+
+    // Limpia cualquier referencia antigua a Maclovin o fotos por defecto de Google no personalizadas
     function sanitizeLegacyPlaceholders() {
         const users = getStoredJSON(STORAGE_KEYS.USERS, null);
         if (users) {
             let modified = false;
             Object.keys(users).forEach(uid => {
                 const u = users[uid];
-                if (u.avatar === 'Images/Maclovin.png') {
+                if (!u) return;
+                if (
+                    !u.avatar ||
+                    u.avatar === 'Images/Maclovin.png' ||
+                    (!u.customAvatar && isGoogleDefaultPhotoUrl(u.avatar))
+                ) {
                     u.avatar = DEFAULT_AVATAR;
                     modified = true;
                 }
-                if (u.banner === 'Images/MaclovinMaGrande.png') {
+                if (!u.banner || u.banner === 'Images/MaclovinMaGrande.png') {
                     u.banner = DEFAULT_BANNER;
                     modified = true;
                 }
@@ -158,14 +180,16 @@
         if (Array.isArray(posts)) {
             let modified = false;
             posts.forEach(p => {
-                if (p.authorAvatar === 'Images/Maclovin.png') {
-                    p.authorAvatar = DEFAULT_AVATAR;
+                if (!p.authorAvatar || p.authorAvatar === 'Images/Maclovin.png' || isGoogleDefaultPhotoUrl(p.authorAvatar)) {
+                    const authorUser = users && users[p.authorId];
+                    p.authorAvatar = (authorUser && authorUser.customAvatar && authorUser.avatar) ? authorUser.avatar : DEFAULT_AVATAR;
                     modified = true;
                 }
                 if (Array.isArray(p.comments)) {
                     p.comments.forEach(c => {
-                        if (c.authorAvatar === 'Images/Maclovin.png') {
-                            c.authorAvatar = DEFAULT_AVATAR;
+                        if (!c.authorAvatar || c.authorAvatar === 'Images/Maclovin.png' || isGoogleDefaultPhotoUrl(c.authorAvatar)) {
+                            const commentUser = users && users[c.authorId];
+                            c.authorAvatar = (commentUser && commentUser.customAvatar && commentUser.avatar) ? commentUser.avatar : DEFAULT_AVATAR;
                             modified = true;
                         }
                     });
@@ -199,11 +223,27 @@
 
     function cacheUserProfileLocally(profile) {
         if (!profile || !profile.id) return;
-        if (profile.avatar === 'Images/Maclovin.png') profile.avatar = DEFAULT_AVATAR;
-        if (profile.banner === 'Images/MaclovinMaGrande.png') profile.banner = DEFAULT_BANNER;
+        if (
+            !profile.avatar ||
+            profile.avatar === 'Images/Maclovin.png' ||
+            (!profile.customAvatar && isGoogleDefaultPhotoUrl(profile.avatar))
+        ) {
+            profile.avatar = DEFAULT_AVATAR;
+        }
+        if (!profile.banner || profile.banner === 'Images/MaclovinMaGrande.png') {
+            profile.banner = DEFAULT_BANNER;
+        }
         const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
         users[profile.id] = profile;
         setStoredJSON(STORAGE_KEYS.USERS, users);
+    }
+
+    function isGoogleAccount(user) {
+        if (!user) return false;
+        if (user.authProvider === 'google') return true;
+        if (user.authProvider === 'password') return false;
+        // Fallback heurístico para cuentas Google previas cuyo ID no empieza por user_
+        return Boolean(user.id && !String(user.id).startsWith('user_'));
     }
 
     // =========================================================================
@@ -211,7 +251,7 @@
     // =========================================================================
     function applyProfileToDOMSynchronously(user) {
         if (!user) return;
-        const avatarSrc = user.avatar || DEFAULT_AVATAR;
+        const avatarSrc = (user.customAvatar && user.avatar) ? user.avatar : (isGoogleDefaultPhotoUrl(user.avatar) ? DEFAULT_AVATAR : (user.avatar || DEFAULT_AVATAR));
         const bannerSrc = user.banner || DEFAULT_BANNER;
 
         // 1. Vista Mi Perfil (myprofile.html)
@@ -236,6 +276,7 @@
         const settingsPic = document.getElementById('settings-user-pic');
         const settingsHeader = document.getElementById('settings-user-header');
         const notifToggle = document.getElementById('notifications-toggle');
+        const passwordRow = document.querySelector('.settings-panels-content[data-field="password"]');
 
         if (settingsPic) {
             settingsPic.referrerPolicy = 'no-referrer';
@@ -245,6 +286,9 @@
         if (notifToggle && typeof user.notificationsEnabled === 'boolean') {
             notifToggle.checked = user.notificationsEnabled;
         }
+        if (passwordRow) {
+            passwordRow.style.display = isGoogleAccount(user) ? 'none' : '';
+        }
 
         ['username', 'bio', 'nombres', 'apellidos', 'email', 'password'].forEach(key => {
             const row = document.querySelector(`.settings-panels-content[data-field="${key}"]`);
@@ -252,7 +296,7 @@
             const pElem = row.querySelector('.settings-icon-container p');
             if (pElem && user[key] !== undefined) {
                 pElem.textContent = (key === 'password')
-                    ? '•'.repeat(Math.max(6, String(user[key]).length))
+                    ? '••••••••'
                     : (user[key] || '—');
             }
         });
@@ -262,6 +306,55 @@
         if (publishAvatar) {
             publishAvatar.referrerPolicy = 'no-referrer';
             publishAvatar.src = avatarSrc;
+        }
+
+        // 4. Progreso de lectura en chapterOneOverview.html
+        const overviewProgressEl = document.getElementById('overview-chapter-progress') || document.querySelector('.js-progress');
+        if (overviewProgressEl) {
+            const chapters = getStoredJSON(STORAGE_KEYS.CHAPTERS, SEED_CHAPTERS);
+            const ch = chapters['chapter_1'] || SEED_CHAPTERS['chapter_1'];
+            const totalPanels = ch.totalPanels || TOTAL_CHAPTER_1_PANELS;
+            const readPanels = (user.chapterProgress && typeof user.chapterProgress['chapter_1'] === 'number')
+                ? Math.min(totalPanels, Math.max(0, user.chapterProgress['chapter_1']))
+                : 0;
+            overviewProgressEl.textContent = `${readPanels}/${totalPanels}`;
+        }
+    }
+
+    function applyChapterMetricsToDOMSynchronously() {
+        const cachedUid = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
+        const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
+        const chapters = getStoredJSON(STORAGE_KEYS.CHAPTERS, SEED_CHAPTERS);
+        const ch = chapters['chapter_1'] || SEED_CHAPTERS['chapter_1'];
+        const activeUid = cachedUid || DEFAULT_CURRENT_USER_ID;
+        const hasLiked = Array.isArray(ch.likes) && ch.likes.includes(activeUid);
+        const likesCount = typeof ch.likesCount === 'number' ? ch.likesCount : 1200;
+        const viewsCount = typeof ch.viewsCount === 'number' ? ch.viewsCount : 2700;
+        const totalPanels = ch.totalPanels || TOTAL_CHAPTER_1_PANELS;
+
+        // En chapterReader.html
+        const chapterLikesCountEl = document.getElementById('chapter-likes-count');
+        const chapterLikeBtn = document.getElementById('btn-chapter-like');
+        const likesInteractionBox = document.getElementById('likes-interaction');
+        if (chapterLikesCountEl) {
+            chapterLikesCountEl.textContent = likesCount;
+            if (chapterLikeBtn) chapterLikeBtn.classList.toggle('active-like', hasLiked);
+            if (likesInteractionBox) likesInteractionBox.classList.toggle('active-like', hasLiked);
+        }
+
+        // En chapterOneOverview.html
+        const overviewLikesEl = document.getElementById('overview-chapter-likes') || document.querySelector('.js-chapter-likes');
+        const overviewViewsEl = document.getElementById('overview-chapter-views') || document.querySelector('.js-views');
+        const overviewProgressEl = document.getElementById('overview-chapter-progress') || document.querySelector('.js-progress');
+
+        if (overviewLikesEl) overviewLikesEl.textContent = likesCount;
+        if (overviewViewsEl) overviewViewsEl.textContent = viewsCount;
+        if (overviewProgressEl) {
+            const activeUser = (cachedUid && users[cachedUid]) ? users[cachedUid] : null;
+            const readPanels = (activeUser && activeUser.chapterProgress && typeof activeUser.chapterProgress['chapter_1'] === 'number')
+                ? Math.min(totalPanels, Math.max(0, activeUser.chapterProgress['chapter_1']))
+                : 0;
+            overviewProgressEl.textContent = `${readPanels}/${totalPanels}`;
         }
     }
 
@@ -295,19 +388,7 @@
             }
         }
 
-        // Pre-hidratar likes globales del capítulo en chapterReader.html
-        const chapterLikesCountEl = document.getElementById('chapter-likes-count');
-        const chapterLikeBtn = document.getElementById('btn-chapter-like');
-        const likesInteractionBox = document.getElementById('likes-interaction');
-        if (chapterLikesCountEl) {
-            const chapters = getStoredJSON(STORAGE_KEYS.CHAPTERS, SEED_CHAPTERS);
-            const ch = chapters['chapter_1'] || SEED_CHAPTERS['chapter_1'];
-            const activeUid = cachedUid || DEFAULT_CURRENT_USER_ID;
-            const hasLiked = Array.isArray(ch.likes) && ch.likes.includes(activeUid);
-            chapterLikesCountEl.textContent = ch.likesCount ?? 1200;
-            if (chapterLikeBtn) chapterLikeBtn.classList.toggle('active-like', hasLiked);
-            if (likesInteractionBox) likesInteractionBox.classList.toggle('active-like', hasLiked);
-        }
+        applyChapterMetricsToDOMSynchronously();
     }
 
     // Ejecutar pre-hidratación inmediatamente al evaluar este script (0ms)
@@ -323,6 +404,7 @@
     let currentAuthUser = null;
     let firebaseReady = false;
     let initPromise = null;
+    let realtimeListenersAttached = false;
 
     function initFirebase() {
         if (initPromise) return initPromise;
@@ -350,7 +432,6 @@
                         currentAuthUser = user || null;
                         if (user) {
                             localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, user.uid);
-                            // Sincronizar perfil en segundo plano sin bloquear el hilo principal
                             ensureUserProfileInFirestore(user).then(syncedProfile => {
                                 if (syncedProfile) {
                                     applyProfileToDOMSynchronously(syncedProfile);
@@ -359,8 +440,25 @@
                                 console.warn('[Firebase Profile Sync Warning]', err);
                             });
                         } else {
-                            if (sessionStorage.getItem('overflow_demo_mode') !== 'true') {
+                            // Respetar sesiones activas iniciadas con Usuario y Contraseña (sin Google)
+                            const cachedUid = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
+                            const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
+                            const cachedUser = cachedUid ? users[cachedUid] : null;
+                            const isCustomPasswordSession = Boolean(
+                                cachedUser && (cachedUser.authProvider === 'password' || String(cachedUid).startsWith('user_'))
+                            );
+
+                            if (!isCustomPasswordSession && sessionStorage.getItem('overflow_demo_mode') !== 'true') {
                                 localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+                            } else if (isCustomPasswordSession && fbDb && fsModRef) {
+                                // Sincronizar perfil propio desde Firestore en segundo plano
+                                fsModRef.getDoc(fsModRef.doc(fbDb, 'users', cachedUid)).then(snap => {
+                                    if (snap.exists()) {
+                                        const cloudData = snap.data();
+                                        cacheUserProfileLocally(cloudData);
+                                        applyProfileToDOMSynchronously(cloudData);
+                                    }
+                                }).catch(() => {});
                             }
                         }
                         if (firstCheck) {
@@ -372,10 +470,11 @@
 
                 firebaseReady = true;
 
-                // Sembrar datos iniciales y sincronizar posts y capítulos en segundo plano
+                // Sembrar datos iniciales y activar sincronización en tiempo real
                 ensureSeedDataInFirestore().catch(() => {});
                 syncPostsFromFirestoreInBackground().catch(() => {});
                 syncChaptersFromFirestoreInBackground().catch(() => {});
+                attachRealtimeFirestoreListeners();
 
                 return true;
             } catch (err) {
@@ -388,21 +487,88 @@
         return initPromise;
     }
 
-    // Iniciar carga de Firebase en segundo plano
     initFirebase();
+
+    function attachRealtimeFirestoreListeners() {
+        if (realtimeListenersAttached || !fbDb || !fsModRef || !fsModRef.onSnapshot) return;
+        realtimeListenersAttached = true;
+
+        try {
+            // Suscripción en tiempo real a capítulos (likes globales y vistas)
+            const chaptersCol = fsModRef.collection(fbDb, 'chapters');
+            fsModRef.onSnapshot(chaptersCol, (snap) => {
+                const cloudChapters = getStoredJSON(STORAGE_KEYS.CHAPTERS, SEED_CHAPTERS);
+                let hasDocs = false;
+                snap.forEach(docSnap => {
+                    const data = docSnap.data();
+                    if (data && data.id) {
+                        cloudChapters[data.id] = {
+                            ...SEED_CHAPTERS[data.id],
+                            ...data
+                        };
+                        hasDocs = true;
+                    }
+                });
+                if (hasDocs) {
+                    setStoredJSON(STORAGE_KEYS.CHAPTERS, cloudChapters);
+                    applyChapterMetricsToDOMSynchronously();
+                    window.dispatchEvent(new CustomEvent('overflow:chapters-synced', { detail: cloudChapters }));
+                }
+            }, () => {});
+
+            // Suscripción en tiempo real a publicaciones de comunidad
+            const postsCol = fsModRef.collection(fbDb, 'posts');
+            fsModRef.onSnapshot(postsCol, (snap) => {
+                const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
+                const cloudPosts = [];
+                snap.forEach(docSnap => {
+                    const p = docSnap.data();
+                    if (!p.authorAvatar || p.authorAvatar === 'Images/Maclovin.png' || isGoogleDefaultPhotoUrl(p.authorAvatar)) {
+                        const u = users[p.authorId];
+                        p.authorAvatar = (u && u.customAvatar && u.avatar) ? u.avatar : DEFAULT_AVATAR;
+                    }
+                    if (Array.isArray(p.comments)) {
+                        p.comments.forEach(c => {
+                            if (!c.authorAvatar || c.authorAvatar === 'Images/Maclovin.png' || isGoogleDefaultPhotoUrl(c.authorAvatar)) {
+                                const cu = users[c.authorId];
+                                c.authorAvatar = (cu && cu.customAvatar && cu.avatar) ? cu.avatar : DEFAULT_AVATAR;
+                            }
+                        });
+                    }
+                    cloudPosts.push(p);
+                });
+                cloudPosts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                if (cloudPosts.length > 0) {
+                    const prevRaw = localStorage.getItem(STORAGE_KEYS.POSTS);
+                    const nextRaw = JSON.stringify(cloudPosts);
+                    if (prevRaw !== nextRaw) {
+                        localStorage.setItem(STORAGE_KEYS.POSTS, nextRaw);
+                        window.dispatchEvent(new CustomEvent('overflow:posts-synced', { detail: cloudPosts }));
+                    }
+                }
+            }, () => {});
+        } catch (e) {}
+    }
 
     async function syncPostsFromFirestoreInBackground() {
         if (!fbDb || !fsModRef) return null;
         try {
             const postsCol = fsModRef.collection(fbDb, 'posts');
             const snap = await fsModRef.getDocs(postsCol);
+            const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
             const cloudPosts = [];
             snap.forEach(docSnap => {
                 const p = docSnap.data();
-                if (p.authorAvatar === 'Images/Maclovin.png') p.authorAvatar = DEFAULT_AVATAR;
+                if (!p.authorAvatar || p.authorAvatar === 'Images/Maclovin.png' || isGoogleDefaultPhotoUrl(p.authorAvatar)) {
+                    const u = users[p.authorId];
+                    p.authorAvatar = (u && u.customAvatar && u.avatar) ? u.avatar : DEFAULT_AVATAR;
+                }
                 if (Array.isArray(p.comments)) {
                     p.comments.forEach(c => {
-                        if (c.authorAvatar === 'Images/Maclovin.png') c.authorAvatar = DEFAULT_AVATAR;
+                        if (!c.authorAvatar || c.authorAvatar === 'Images/Maclovin.png' || isGoogleDefaultPhotoUrl(c.authorAvatar)) {
+                            const cu = users[c.authorId];
+                            c.authorAvatar = (cu && cu.customAvatar && cu.avatar) ? cu.avatar : DEFAULT_AVATAR;
+                        }
                     });
                 }
                 cloudPosts.push(p);
@@ -433,7 +599,10 @@
             snap.forEach(docSnap => {
                 const data = docSnap.data();
                 if (data && data.id) {
-                    cloudChapters[data.id] = data;
+                    cloudChapters[data.id] = {
+                        ...SEED_CHAPTERS[data.id],
+                        ...data
+                    };
                     hasDocs = true;
                 }
             });
@@ -442,6 +611,7 @@
                 const nextRaw = JSON.stringify(cloudChapters);
                 if (prevRaw !== nextRaw) {
                     localStorage.setItem(STORAGE_KEYS.CHAPTERS, nextRaw);
+                    applyChapterMetricsToDOMSynchronously();
                     window.dispatchEvent(new CustomEvent('overflow:chapters-synced', { detail: cloudChapters }));
                 }
             }
@@ -462,11 +632,12 @@
             let needsUpdate = false;
             const updates = {};
 
-            if ((!data.avatar || data.avatar === 'Images/Maclovin.png') && authUser.photoURL) {
-                updates.avatar = authUser.photoURL;
-                data.avatar = authUser.photoURL;
-                needsUpdate = true;
-            } else if (data.avatar === 'Images/Maclovin.png') {
+            // Regla estricta: Nunca usar la imagen de Google como avatar por defecto; usar siempre el placeholder a menos que haya subido una foto propia (customAvatar)
+            if (
+                !data.avatar ||
+                data.avatar === 'Images/Maclovin.png' ||
+                (!data.customAvatar && isGoogleDefaultPhotoUrl(data.avatar))
+            ) {
                 updates.avatar = DEFAULT_AVATAR;
                 data.avatar = DEFAULT_AVATAR;
                 needsUpdate = true;
@@ -475,6 +646,12 @@
             if (!data.banner || data.banner === 'Images/MaclovinMaGrande.png') {
                 updates.banner = DEFAULT_BANNER;
                 data.banner = DEFAULT_BANNER;
+                needsUpdate = true;
+            }
+
+            if (!data.authProvider) {
+                updates.authProvider = 'google';
+                data.authProvider = 'google';
                 needsUpdate = true;
             }
 
@@ -505,10 +682,8 @@
         const nombres = nameParts[0] || 'Lector';
         const apellidos = nameParts.slice(1).join(' ') || '';
 
-        const emailPrefix = authUser.email ? authUser.email.split('@')[0] : 'lector';
-        const cleanUsername = displayName
-            ? displayName.replace(/\s+/g, '_')
-            : `${emailPrefix}_${authUser.uid.slice(0, 4)}`;
+        const emailPrefix = authUser.email ? authUser.email.split('@')[0].slice(0, 14) : 'lector';
+        const suggestedUsername = emailPrefix.replace(/[^a-zA-Z0-9_]/g, '_') || `lector_${authUser.uid.slice(0, 4)}`;
 
         const currentLocalChapter = localStorage.getItem(STORAGE_KEYS.ACTIVE_CHAPTER)
             || localStorage.getItem('activeChapter')
@@ -518,14 +693,18 @@
 
         const newProfile = {
             id: authUser.uid,
-            username: cleanUsername,
+            username: suggestedUsername,
             nombres: nombres,
             apellidos: apellidos,
             email: authUser.email || '',
-            password: '••••••••',
+            password: '',
+            authProvider: 'google',
+            usernameConfirmed: false, // Se pedirá confirmar/elegir username en el modal
             bio: '¡Hola! Soy lector de Overflow: Diarios de un prófugo.',
-            avatar: authUser.photoURL || DEFAULT_AVATAR,
+            avatar: DEFAULT_AVATAR,
             banner: DEFAULT_BANNER,
+            customAvatar: false,
+            customBanner: false,
             activeChapter: String(currentLocalChapter),
             notificationsEnabled: true,
             volume: currentLocalVolume,
@@ -533,6 +712,7 @@
             followingCount: 0,
             following: [],
             reposts: [],
+            chapterProgress: { chapter_1: 0 },
             createdAt: Date.now()
         };
 
@@ -567,31 +747,100 @@
             const cSnap = await fsModRef.getDoc(cRef);
             if (!cSnap.exists()) {
                 await fsModRef.setDoc(cRef, SEED_CHAPTERS[chId]);
+            } else {
+                const cData = cSnap.data();
+                if (typeof cData.viewsCount !== 'number' || typeof cData.totalPanels !== 'number') {
+                    await fsModRef.setDoc(cRef, {
+                        viewsCount: typeof cData.viewsCount === 'number' ? cData.viewsCount : 2700,
+                        totalPanels: typeof cData.totalPanels === 'number' ? cData.totalPanels : TOTAL_CHAPTER_1_PANELS
+                    }, { merge: true });
+                }
             }
         }
     }
 
-    function showGoogleAuthModal() {
+    // =========================================================================
+    // MODAL DE AUTENTICACIÓN DUAL (USUARIO/CONTRASEÑA + GOOGLE CON @USERNAME)
+    // =========================================================================
+    function showAuthModal(initialStep = 'auth', preloadedProfile = null) {
         return new Promise((resolve) => {
             let modal = document.getElementById('overflow-auth-modal');
-            if (!modal) {
-                modal = document.createElement('div');
-                modal.id = 'overflow-auth-modal';
-                modal.className = 'auth-modal-backdrop';
-                modal.innerHTML = `
-                    <article class="auth-modal-card" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
-                        <div class="auth-modal-logo-badge">
-                            <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M16 2C8.26801 2 2 8.26801 2 16C2 23.732 8.26801 30 16 30C23.732 30 30 23.732 30 16C30 8.26801 23.732 2 16 2ZM16 10.5C18.7614 10.5 21 12.7386 21 15.5C21 18.2614 18.7614 20.5 16 20.5C13.2386 20.5 11 18.2614 11 15.5C11 12.7386 13.2386 10.5 16 10.5ZM16 27.2C12.2 27.2 8.85 25.28 6.88 22.35C8.15 19.98 11.75 18.5 16 18.5C20.25 18.5 23.85 19.98 25.12 22.35C23.15 25.28 19.8 27.2 16 27.2Z" fill="#D4DBE4"/>
-                            </svg>
+            if (modal) modal.remove();
+
+            modal = document.createElement('div');
+            modal.id = 'overflow-auth-modal';
+            modal.className = 'auth-modal-backdrop';
+            modal.innerHTML = `
+                <article class="auth-modal-card" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+                    <div class="auth-modal-logo-badge" aria-hidden="true">
+                        <svg width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M16 2C8.26801 2 2 8.26801 2 16C2 23.732 8.26801 30 16 30C23.732 30 30 23.732 30 16C30 8.26801 23.732 2 16 2ZM16 10.5C18.7614 10.5 21 12.7386 21 15.5C21 18.2614 18.7614 20.5 16 20.5C13.2386 20.5 11 18.2614 11 15.5C11 12.7386 13.2386 10.5 16 10.5ZM16 27.2C12.2 27.2 8.85 25.28 6.88 22.35C8.15 19.98 11.75 18.5 16 18.5C20.25 18.5 23.85 19.98 25.12 22.35C23.15 25.28 19.8 27.2 16 27.2Z" fill="#D4DBE4"/>
+                        </svg>
+                    </div>
+                    <h2 id="auth-modal-title" class="auth-modal-title">Bienvenido a Overflow</h2>
+                    <p id="auth-modal-subtitle" class="auth-modal-subtitle">
+                        Inicia sesión o crea tu cuenta personal para participar en la comunidad y guardar tu progreso.
+                    </p>
+
+                    <div id="auth-modal-error" class="auth-modal-error" role="alert"></div>
+
+                    <!-- VISTA 1: TABS DE LOGIN / REGISTRO + GOOGLE -->
+                    <div id="auth-step-main" class="auth-step-container">
+                        <div class="auth-tabs" role="tablist" aria-label="Método de acceso">
+                            <button type="button" class="auth-tab-btn active" id="tab-auth-login" role="tab" aria-selected="true">Iniciar Sesión</button>
+                            <button type="button" class="auth-tab-btn" id="tab-auth-register" role="tab" aria-selected="false">Crear Cuenta</button>
                         </div>
-                        <h2 id="auth-modal-title" class="auth-modal-title">Bienvenido a Overflow</h2>
-                        <p class="auth-modal-subtitle">
-                            Inicia sesión con tu cuenta de Google para crear tu perfil personal en la nube, guardar tu progreso de lectura y participar en la comunidad.
-                        </p>
-                        <div id="auth-modal-error" class="auth-modal-error"></div>
+
+                        <!-- FORMULARIO: INICIAR SESIÓN CON USUARIO Y CONTRASEÑA -->
+                        <form id="form-auth-login" class="auth-form" novalidate>
+                            <div class="auth-field-group">
+                                <label for="login-username" class="auth-field-label">Usuario o Correo</label>
+                                <input type="text" id="login-username" name="username" class="auth-input" placeholder="Ej. lector_overflow" autocomplete="username" spellcheck="false" autocorrect="off" autocapitalize="none" enterkeyhint="next" maxlength="60" required />
+                            </div>
+                            <div class="auth-field-group">
+                                <label for="current-password" class="auth-field-label">Contraseña</label>
+                                <input type="password" id="current-password" name="current-password" class="auth-input" placeholder="Ingresa tu contraseña" autocomplete="current-password" enterkeyhint="done" required />
+                            </div>
+                            <button type="submit" id="btn-submit-login" class="btn-auth-primary">
+                                <span>Entrar con Usuario</span>
+                            </button>
+                        </form>
+
+                        <!-- FORMULARIO: CREAR CUENTA SIN VINCULAR GOOGLE -->
+                        <form id="form-auth-register" class="auth-form" style="display: none;" novalidate>
+                            <div class="auth-field-group">
+                                <label for="reg-username" class="auth-field-label">Nombre de usuario (@username)</label>
+                                <input type="text" id="reg-username" name="username" class="auth-input" placeholder="Máx. 20 caracteres (ej. alex_99)" autocomplete="username" spellcheck="false" autocorrect="off" autocapitalize="none" enterkeyhint="next" maxlength="20" required />
+                            </div>
+                            <div class="auth-field-row">
+                                <div class="auth-field-group">
+                                    <label for="reg-nombres" class="auth-field-label">Nombre</label>
+                                    <input type="text" id="reg-nombres" name="given-name" class="auth-input" placeholder="Tu nombre" autocomplete="given-name" enterkeyhint="next" maxlength="50" required />
+                                </div>
+                                <div class="auth-field-group">
+                                    <label for="reg-apellidos" class="auth-field-label">Apellido</label>
+                                    <input type="text" id="reg-apellidos" name="family-name" class="auth-input" placeholder="Tu apellido" autocomplete="family-name" enterkeyhint="next" maxlength="50" required />
+                                </div>
+                            </div>
+                            <div class="auth-field-group">
+                                <label for="reg-email" class="auth-field-label">Correo electrónico</label>
+                                <input type="email" id="reg-email" name="email" class="auth-input" placeholder="tucorreo@ejemplo.com" autocomplete="email" inputmode="email" spellcheck="false" autocapitalize="none" enterkeyhint="next" maxlength="120" required />
+                            </div>
+                            <div class="auth-field-group">
+                                <label for="new-password" class="auth-field-label">Contraseña</label>
+                                <input type="password" id="new-password" name="new-password" class="auth-input" placeholder="Mínimo 4 caracteres" autocomplete="new-password" enterkeyhint="done" required />
+                            </div>
+                            <button type="submit" id="btn-submit-register" class="btn-auth-primary">
+                                <span>Crear Cuenta</span>
+                            </button>
+                        </form>
+
+                        <div class="auth-divider">
+                            <span>o continúa con</span>
+                        </div>
+
                         <button type="button" id="btn-google-signin" class="btn-google-login">
-                            <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                            <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                                 <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                                 <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
                                 <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
@@ -599,32 +848,208 @@
                             </svg>
                             <span id="btn-google-signin-text">Continuar con Google</span>
                         </button>
+
                         <button type="button" id="btn-auth-back-home" class="btn-auth-secondary">
-                            Volver al Inicio (Modo Invitado)
+                            Volver al Inicio
                         </button>
-                    </article>
-                `;
-                document.body.appendChild(modal);
-            }
+                    </div>
+
+                    <!-- VISTA 2: PASO OBLIGATORIO PARA ELEGIR @USERNAME TRAS INICIAR CON GOOGLE -->
+                    <form id="form-google-username" class="auth-form auth-step-container" style="display: none;" novalidate>
+                        <div class="auth-field-group">
+                            <label for="google-custom-username" class="auth-field-label">Elige tu nombre de usuario</label>
+                            <input type="text" id="google-custom-username" name="username" class="auth-input" placeholder="Ej. sebas_overflow (3-20 caracteres)" spellcheck="false" autocorrect="off" autocapitalize="none" enterkeyhint="next" maxlength="20" required />
+                        </div>
+                        <div class="auth-field-row">
+                            <div class="auth-field-group">
+                                <label for="google-custom-nombres" class="auth-field-label">Nombre</label>
+                                <input type="text" id="google-custom-nombres" name="given-name" class="auth-input" placeholder="Tu nombre" enterkeyhint="next" maxlength="50" required />
+                            </div>
+                            <div class="auth-field-group">
+                                <label for="google-custom-apellidos" class="auth-field-label">Apellido</label>
+                                <input type="text" id="google-custom-apellidos" name="family-name" class="auth-input" placeholder="Tu apellido" enterkeyhint="done" maxlength="50" />
+                            </div>
+                        </div>
+                        <button type="submit" id="btn-save-google-username" class="btn-auth-primary">
+                            <span>Guardar y Continuar</span>
+                        </button>
+                    </form>
+                </article>
+            `;
+            document.body.appendChild(modal);
 
             requestAnimationFrame(() => {
                 modal.classList.add('active');
             });
 
+            const titleEl = modal.querySelector('#auth-modal-title');
+            const subtitleEl = modal.querySelector('#auth-modal-subtitle');
+            const errorBox = modal.querySelector('#auth-modal-error');
+            const stepMain = modal.querySelector('#auth-step-main');
+            const formLogin = modal.querySelector('#form-auth-login');
+            const formRegister = modal.querySelector('#form-auth-register');
+            const formGoogleUsername = modal.querySelector('#form-google-username');
+            const tabLogin = modal.querySelector('#tab-auth-login');
+            const tabRegister = modal.querySelector('#tab-auth-register');
             const btnGoogle = modal.querySelector('#btn-google-signin');
             const btnGoogleText = modal.querySelector('#btn-google-signin-text');
             const btnBackHome = modal.querySelector('#btn-auth-back-home');
-            const errorBox = modal.querySelector('#auth-modal-error');
 
-            btnGoogle.onclick = async () => {
+            let pendingGoogleProfile = preloadedProfile;
+
+            function showError(msg) {
+                errorBox.textContent = msg;
+                errorBox.style.display = 'block';
+            }
+
+            function hideError() {
+                errorBox.textContent = '';
                 errorBox.style.display = 'none';
+            }
+
+            function openGoogleUsernameStep(profile) {
+                pendingGoogleProfile = profile;
+                hideError();
+                stepMain.style.display = 'none';
+                formGoogleUsername.style.display = 'flex';
+                titleEl.textContent = 'Elige tu @username';
+                subtitleEl.textContent = 'Personaliza un nombre de usuario corto para mostrar en tu perfil y en la comunidad.';
+
+                const inputUser = modal.querySelector('#google-custom-username');
+                const inputNombres = modal.querySelector('#google-custom-nombres');
+                const inputApellidos = modal.querySelector('#google-custom-apellidos');
+
+                const shortSuggestion = (profile.username || '').slice(0, 16);
+                inputUser.value = shortSuggestion;
+                inputNombres.value = profile.nombres || '';
+                inputApellidos.value = profile.apellidos || '';
+                setTimeout(() => {
+                    inputUser.focus();
+                    inputUser.select();
+                }, 80);
+            }
+
+            if (initialStep === 'google-username' && preloadedProfile) {
+                openGoogleUsernameStep(preloadedProfile);
+            }
+
+            tabLogin.addEventListener('click', () => {
+                hideError();
+                tabLogin.classList.add('active');
+                tabLogin.setAttribute('aria-selected', 'true');
+                tabRegister.classList.remove('active');
+                tabRegister.setAttribute('aria-selected', 'false');
+                formLogin.style.display = 'flex';
+                formRegister.style.display = 'none';
+            });
+
+            tabRegister.addEventListener('click', () => {
+                hideError();
+                tabRegister.classList.add('active');
+                tabRegister.setAttribute('aria-selected', 'true');
+                tabLogin.classList.remove('active');
+                tabLogin.setAttribute('aria-selected', 'false');
+                formRegister.style.display = 'flex';
+                formLogin.style.display = 'none';
+            });
+
+            // 1. Login con Usuario y Contraseña
+            formLogin.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                hideError();
+                const identifier = modal.querySelector('#login-username').value.trim();
+                const password = modal.querySelector('#current-password').value;
+
+                if (!identifier || !password) {
+                    showError('Por favor ingresa tu nombre de usuario y tu contraseña.');
+                    return;
+                }
+
+                const submitBtn = modal.querySelector('#btn-submit-login');
+                submitBtn.disabled = true;
+                submitBtn.querySelector('span').textContent = 'Verificando...';
+
+                try {
+                    const profile = await DB.loginWithCredentials(identifier, password);
+                    applyProfileToDOMSynchronously(profile);
+                    modal.classList.remove('active');
+                    setTimeout(() => modal.remove(), 300);
+                    resolve(profile);
+                } catch (err) {
+                    submitBtn.disabled = false;
+                    submitBtn.querySelector('span').textContent = 'Entrar con Usuario';
+                    showError(err.message || 'Usuario o contraseña incorrectos.');
+                }
+            });
+
+            // 2. Registro con Usuario, Nombre, Apellido, Correo y Contraseña
+            formRegister.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                hideError();
+
+                const username = modal.querySelector('#reg-username').value.trim();
+                const nombres = modal.querySelector('#reg-nombres').value.trim();
+                const apellidos = modal.querySelector('#reg-apellidos').value.trim();
+                const email = modal.querySelector('#reg-email').value.trim();
+                const password = modal.querySelector('#new-password').value;
+
+                if (username.length < 3 || username.length > 20) {
+                    showError('El nombre de usuario debe tener entre 3 y 20 caracteres.');
+                    return;
+                }
+                if (!nombres) {
+                    showError('Por favor ingresa tu nombre.');
+                    return;
+                }
+                if (!email || !email.includes('@')) {
+                    showError('Por favor ingresa un correo electrónico válido.');
+                    return;
+                }
+                if (!password || password.length < 4) {
+                    showError('La contraseña debe tener al menos 4 caracteres.');
+                    return;
+                }
+
+                const submitBtn = modal.querySelector('#btn-submit-register');
+                submitBtn.disabled = true;
+                submitBtn.querySelector('span').textContent = 'Creando cuenta...';
+
+                try {
+                    const profile = await DB.registerWithCredentials({
+                        username,
+                        nombres,
+                        apellidos,
+                        email,
+                        password
+                    });
+                    applyProfileToDOMSynchronously(profile);
+                    modal.classList.remove('active');
+                    setTimeout(() => modal.remove(), 300);
+                    resolve(profile);
+                } catch (err) {
+                    submitBtn.disabled = false;
+                    submitBtn.querySelector('span').textContent = 'Crear Cuenta';
+                    showError(err.message || 'No se pudo crear la cuenta.');
+                }
+            });
+
+            // 3. Login con Google + Paso de elección de @username
+            btnGoogle.addEventListener('click', async () => {
+                hideError();
                 btnGoogle.disabled = true;
                 btnGoogleText.textContent = 'Conectando con Google...';
 
                 try {
                     const profile = await DB.loginWithGoogle();
+                    if (!profile.usernameConfirmed) {
+                        btnGoogle.disabled = false;
+                        btnGoogleText.textContent = 'Continuar con Google';
+                        openGoogleUsernameStep(profile);
+                        return;
+                    }
                     applyProfileToDOMSynchronously(profile);
                     modal.classList.remove('active');
+                    setTimeout(() => modal.remove(), 300);
                     resolve(profile);
                 } catch (err) {
                     btnGoogle.disabled = false;
@@ -633,19 +1058,59 @@
                     let msg = 'No se pudo iniciar sesión con Google. ';
                     if (err && err.code === 'auth/popup-closed-by-user') {
                         msg = 'Cerraste la ventana de Google antes de completar el acceso.';
-                    } else if (err && (err.code === 'auth/unauthorized-domain' || err.code === 'auth/operation-not-supported-in-this-environment')) {
-                        msg = 'Abre el proyecto usando Live Server (http://localhost o http://127.0.0.1) y asegúrate de que el dominio esté autorizado en Firebase Auth.';
                     } else if (err && err.message) {
                         msg += err.message;
                     }
-                    errorBox.textContent = msg;
-                    errorBox.style.display = 'block';
+                    showError(msg);
                 }
-            };
+            });
 
-            btnBackHome.onclick = () => {
+            // 4. Confirmación del @username para cuentas de Google
+            formGoogleUsername.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                hideError();
+
+                const chosenUsername = modal.querySelector('#google-custom-username').value.trim();
+                const chosenNombres = modal.querySelector('#google-custom-nombres').value.trim();
+                const chosenApellidos = modal.querySelector('#google-custom-apellidos').value.trim();
+
+                if (chosenUsername.length < 3 || chosenUsername.length > 20) {
+                    showError('El nombre de usuario debe tener entre 3 y 20 caracteres.');
+                    return;
+                }
+                if (!chosenNombres) {
+                    showError('Por favor ingresa tu nombre.');
+                    return;
+                }
+
+                const btnSave = modal.querySelector('#btn-save-google-username');
+                btnSave.disabled = true;
+                btnSave.querySelector('span').textContent = 'Guardando...';
+
+                try {
+                    const updated = await DB.updateProfile({
+                        username: chosenUsername,
+                        nombres: chosenNombres,
+                        apellidos: chosenApellidos,
+                        authProvider: 'google',
+                        usernameConfirmed: true,
+                        avatar: (pendingGoogleProfile && pendingGoogleProfile.customAvatar) ? pendingGoogleProfile.avatar : DEFAULT_AVATAR
+                    }, pendingGoogleProfile ? pendingGoogleProfile.id : null);
+
+                    applyProfileToDOMSynchronously(updated);
+                    modal.classList.remove('active');
+                    setTimeout(() => modal.remove(), 300);
+                    resolve(updated);
+                } catch (err) {
+                    btnSave.disabled = false;
+                    btnSave.querySelector('span').textContent = 'Guardar y Continuar';
+                    showError(err.message || 'Error al guardar el nombre de usuario.');
+                }
+            });
+
+            btnBackHome.addEventListener('click', () => {
                 window.location.href = 'index.html';
-            };
+            });
         });
     }
 
@@ -653,9 +1118,10 @@
     const DB = {
         DEFAULT_AVATAR,
         DEFAULT_BANNER,
+        isGoogleAccount,
 
         // ==========================================
-        // 0. AUTENTICACIÓN CON GOOGLE (INSTANT CACHE + FIREBASE)
+        // 0. AUTENTICACIÓN DUAL (GOOGLE + USUARIO/CONTRASEÑA)
         // ==========================================
         async loginWithGoogle() {
             await initFirebase();
@@ -670,6 +1136,135 @@
 
             const profile = await ensureUserProfileInFirestore(currentAuthUser);
             return profile;
+        },
+
+        async registerWithCredentials({ username, nombres, apellidos, email, password }) {
+            await initFirebase();
+            const cleanUsername = String(username || '').trim();
+            const cleanEmail = String(email || '').trim().toLowerCase();
+            const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
+
+            // Verificar si el username ya existe en Firestore o en caché local
+            if (fbDb && fsModRef) {
+                try {
+                    const snap = await fsModRef.getDocs(fsModRef.collection(fbDb, 'users'));
+                    snap.forEach(docSnap => {
+                        const u = docSnap.data();
+                        if (u && u.id) users[u.id] = u;
+                    });
+                    setStoredJSON(STORAGE_KEYS.USERS, users);
+                } catch (e) {}
+            }
+
+            const existingUser = Object.values(users).find(u =>
+                u && u.username && u.username.toLowerCase() === cleanUsername.toLowerCase()
+            );
+            if (existingUser) {
+                throw new Error('Ese nombre de usuario ya está en uso. Elige otro.');
+            }
+
+            if (fbAuth && authModRef && currentAuthUser) {
+                try { await authModRef.signOut(fbAuth); } catch (e) {}
+                currentAuthUser = null;
+            }
+
+            const newUserId = 'user_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+            const currentLocalChapter = localStorage.getItem(STORAGE_KEYS.ACTIVE_CHAPTER)
+                || localStorage.getItem('activeChapter')
+                || '1';
+            const currentLocalVolume = Number(localStorage.getItem(STORAGE_KEYS.VOLUME_PREF) || 80);
+
+            const newProfile = {
+                id: newUserId,
+                username: cleanUsername,
+                nombres: String(nombres || '').trim(),
+                apellidos: String(apellidos || '').trim(),
+                email: cleanEmail,
+                password: String(password),
+                authProvider: 'password',
+                usernameConfirmed: true,
+                bio: '¡Hola! Soy lector de Overflow: Diarios de un prófugo.',
+                avatar: DEFAULT_AVATAR,
+                banner: DEFAULT_BANNER,
+                customAvatar: false,
+                customBanner: false,
+                activeChapter: String(currentLocalChapter),
+                notificationsEnabled: true,
+                volume: currentLocalVolume,
+                followersCount: 0,
+                followingCount: 0,
+                following: [],
+                reposts: [],
+                chapterProgress: { chapter_1: 0 },
+                createdAt: Date.now()
+            };
+
+            cacheUserProfileLocally(newProfile);
+            localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, newUserId);
+            sessionStorage.removeItem('overflow_demo_mode');
+
+            if (fbDb && fsModRef) {
+                try {
+                    await fsModRef.setDoc(fsModRef.doc(fbDb, 'users', newUserId), newProfile);
+                } catch (e) {
+                    console.warn('[Firestore registerWithCredentials Sync Warning]', e);
+                }
+            }
+
+            return newProfile;
+        },
+
+        async loginWithCredentials(identifier, password) {
+            await initFirebase();
+            const cleanId = String(identifier || '').trim().toLowerCase();
+            const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
+
+            // Sincronizar usuarios desde Firestore para poder iniciar sesión desde cualquier dispositivo
+            if (fbDb && fsModRef) {
+                try {
+                    const snap = await fsModRef.getDocs(fsModRef.collection(fbDb, 'users'));
+                    snap.forEach(docSnap => {
+                        const u = docSnap.data();
+                        if (u && u.id) {
+                            if (!u.customAvatar && isGoogleDefaultPhotoUrl(u.avatar)) {
+                                u.avatar = DEFAULT_AVATAR;
+                            }
+                            users[u.id] = u;
+                        }
+                    });
+                    setStoredJSON(STORAGE_KEYS.USERS, users);
+                } catch (e) {}
+            }
+
+            const matchedUser = Object.values(users).find(u =>
+                u && (
+                    (u.username && u.username.toLowerCase() === cleanId) ||
+                    (u.email && u.email.toLowerCase() === cleanId)
+                )
+            );
+
+            if (!matchedUser) {
+                throw new Error('No encontramos una cuenta con ese usuario o correo.');
+            }
+
+            if (isGoogleAccount(matchedUser) && (!matchedUser.password || matchedUser.password === '••••••••')) {
+                throw new Error('Esta cuenta fue creada con Google. Usa el botón "Continuar con Google".');
+            }
+
+            if (matchedUser.password !== password) {
+                throw new Error('Contraseña incorrecta. Intenta de nuevo.');
+            }
+
+            if (fbAuth && authModRef && currentAuthUser) {
+                try { await authModRef.signOut(fbAuth); } catch (e) {}
+                currentAuthUser = null;
+            }
+
+            localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, matchedUser.id);
+            sessionStorage.removeItem('overflow_demo_mode');
+            cacheUserProfileLocally(matchedUser);
+
+            return matchedUser;
         },
 
         async logout() {
@@ -695,23 +1290,30 @@
         },
 
         async requireAuth() {
-            // 1. FAST-PATH (0ms): Si ya hay sesión guardada en caché local, devolver el perfil al instante
             const cachedUid = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
             const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
             if (cachedUid && users[cachedUid]) {
-                return users[cachedUid];
+                const user = users[cachedUid];
+                // Si inició sesión con Google y aún no ha confirmado su username corto personalizado, pedirlo
+                if (isGoogleAccount(user) && user.usernameConfirmed === false) {
+                    return await showAuthModal('google-username', user);
+                }
+                return user;
             }
 
-            // 2. Si no hay caché local, esperar a Firebase Auth y pedir login con Google si no hay sesión
             await initFirebase();
             if (currentAuthUser) {
-                return await this.getProfile(currentAuthUser.uid);
+                const profile = await this.getProfile(currentAuthUser.uid);
+                if (profile && isGoogleAccount(profile) && profile.usernameConfirmed === false) {
+                    return await showAuthModal('google-username', profile);
+                }
+                return profile;
             }
-            return await showGoogleAuthModal();
+            return await showAuthModal('auth');
         },
 
         // ==========================================
-        // 1. CAPÍTULOS Y TEMA
+        // 1. CAPÍTULOS, LIKES, VISTAS Y PROGRESO
         // ==========================================
         async getActiveChapter() {
             return localStorage.getItem(STORAGE_KEYS.ACTIVE_CHAPTER)
@@ -725,7 +1327,6 @@
             localStorage.setItem('activeChapter', id);
             document.documentElement.setAttribute('data-chapter', id);
 
-            // Actualizar también en caché local del usuario
             const cachedUid = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
             if (cachedUid) {
                 const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
@@ -735,11 +1336,11 @@
                 }
             }
 
-            // Sincronizar con Cloud Firestore en segundo plano
             initFirebase().then(async () => {
-                if (currentAuthUser && fbDb && fsModRef) {
+                const targetUid = (currentAuthUser && currentAuthUser.uid) || cachedUid;
+                if (targetUid && fbDb && fsModRef) {
                     try {
-                        const userRef = fsModRef.doc(fbDb, 'users', currentAuthUser.uid);
+                        const userRef = fsModRef.doc(fbDb, 'users', targetUid);
                         await fsModRef.setDoc(userRef, { activeChapter: id }, { merge: true });
                     } catch (e) {}
                 }
@@ -768,7 +1369,6 @@
                 setStoredJSON(STORAGE_KEYS.USERS, users);
             }
 
-            // Debounce / sincronizar en segundo plano con el documento del usuario en Cloud Firestore
             if (this._volSyncTimer) clearTimeout(this._volSyncTimer);
             this._volSyncTimer = setTimeout(() => {
                 initFirebase().then(async () => {
@@ -791,24 +1391,101 @@
                 id: chapterId,
                 title: 'Capítulo 1: A la deriva',
                 likes: [],
-                likesCount: 1200
+                likesCount: 1200,
+                viewsCount: 2700,
+                totalPanels: TOTAL_CHAPTER_1_PANELS
             };
 
             const currentUserId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID)
                 || (currentAuthUser && currentAuthUser.uid)
                 || DEFAULT_CURRENT_USER_ID;
 
+            const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
+            const activeUser = users[currentUserId];
+            const totalPanels = typeof ch.totalPanels === 'number' ? ch.totalPanels : TOTAL_CHAPTER_1_PANELS;
+            const panelsRead = (activeUser && activeUser.chapterProgress && typeof activeUser.chapterProgress[chapterId] === 'number')
+                ? Math.min(totalPanels, Math.max(0, activeUser.chapterProgress[chapterId]))
+                : 0;
+
             const hasLiked = Array.isArray(ch.likes) && ch.likes.includes(currentUserId);
 
-            // Sincronizar en segundo plano con Firestore
             initFirebase().then(() => syncChaptersFromFirestoreInBackground());
 
             return {
                 id: ch.id,
                 likesCount: typeof ch.likesCount === 'number' ? ch.likesCount : 1200,
+                viewsCount: typeof ch.viewsCount === 'number' ? ch.viewsCount : 2700,
+                totalPanels,
+                panelsRead,
                 hasLiked,
                 likes: Array.isArray(ch.likes) ? ch.likes : []
             };
+        },
+
+        async incrementChapterView(chapterId = 'chapter_1') {
+            const sessionKey = `overflow_viewed_${chapterId}`;
+            if (sessionStorage.getItem(sessionKey) === 'true') {
+                return await this.getChapterStats(chapterId);
+            }
+            sessionStorage.setItem(sessionKey, 'true');
+
+            const chapters = getStoredJSON(STORAGE_KEYS.CHAPTERS, SEED_CHAPTERS);
+            if (!chapters[chapterId]) {
+                chapters[chapterId] = { ...SEED_CHAPTERS[chapterId] };
+            }
+            const ch = chapters[chapterId];
+            ch.viewsCount = (typeof ch.viewsCount === 'number' ? ch.viewsCount : 2700) + 1;
+            setStoredJSON(STORAGE_KEYS.CHAPTERS, chapters);
+
+            initFirebase().then(async () => {
+                if (fbDb && fsModRef) {
+                    try {
+                        await fsModRef.setDoc(fsModRef.doc(fbDb, 'chapters', chapterId), {
+                            id: ch.id || chapterId,
+                            title: ch.title || 'Capítulo 1: A la deriva',
+                            likes: Array.isArray(ch.likes) ? ch.likes : [],
+                            likesCount: typeof ch.likesCount === 'number' ? ch.likesCount : 1200,
+                            viewsCount: ch.viewsCount,
+                            totalPanels: ch.totalPanels || TOTAL_CHAPTER_1_PANELS
+                        }, { merge: true });
+                    } catch (e) {}
+                }
+            });
+
+            return await this.getChapterStats(chapterId);
+        },
+
+        async saveChapterProgress(chapterId = 'chapter_1', panelsRead = 1, totalPanels = TOTAL_CHAPTER_1_PANELS) {
+            const currentUserId = await this.getCurrentUserId();
+            const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
+            const user = users[currentUserId];
+            if (!user) return;
+
+            if (!user.chapterProgress || typeof user.chapterProgress !== 'object') {
+                user.chapterProgress = {};
+            }
+
+            const prevProgress = user.chapterProgress[chapterId] || 0;
+            const nextProgress = Math.min(totalPanels, Math.max(prevProgress, Math.round(panelsRead)));
+            if (nextProgress === prevProgress) return nextProgress;
+
+            user.chapterProgress[chapterId] = nextProgress;
+            cacheUserProfileLocally(user);
+
+            if (this._progressSyncTimer) clearTimeout(this._progressSyncTimer);
+            this._progressSyncTimer = setTimeout(() => {
+                initFirebase().then(async () => {
+                    if (fbDb && fsModRef) {
+                        try {
+                            await fsModRef.setDoc(fsModRef.doc(fbDb, 'users', currentUserId), {
+                                chapterProgress: user.chapterProgress
+                            }, { merge: true });
+                        } catch (e) {}
+                    }
+                });
+            }, 350);
+
+            return nextProgress;
         },
 
         async toggleChapterLike(chapterId = 'chapter_1') {
@@ -820,7 +1497,9 @@
                         id: chapterId,
                         title: 'Capítulo 1: A la deriva',
                         likes: [],
-                        likesCount: 1200
+                        likesCount: 1200,
+                        viewsCount: 2700,
+                        totalPanels: TOTAL_CHAPTER_1_PANELS
                     })
                 };
             }
@@ -839,16 +1518,18 @@
             }
 
             setStoredJSON(STORAGE_KEYS.CHAPTERS, chapters);
+            applyChapterMetricsToDOMSynchronously();
 
-            // Sincronizar globalmente con Cloud Firestore
             initFirebase().then(async () => {
                 if (fbDb && fsModRef) {
                     try {
                         await fsModRef.setDoc(fsModRef.doc(fbDb, 'chapters', chapterId), {
-                            id: ch.id,
+                            id: ch.id || chapterId,
                             title: ch.title || 'Capítulo 1: A la deriva',
                             likes: ch.likes,
-                            likesCount: ch.likesCount
+                            likesCount: ch.likesCount,
+                            viewsCount: typeof ch.viewsCount === 'number' ? ch.viewsCount : 2700,
+                            totalPanels: ch.totalPanels || TOTAL_CHAPTER_1_PANELS
                         }, { merge: true });
                     } catch (e) {
                         console.warn('[Firestore toggleChapterLike Sync Warning]', e);
@@ -877,8 +1558,6 @@
             const targetId = userId || localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || (currentAuthUser && currentAuthUser.uid) || DEFAULT_CURRENT_USER_ID;
             const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
 
-            // FAST-PATH (0ms): Si el usuario ya está en caché local, devolverlo de inmediato
-            // y disparar actualización silenciosa desde Firestore en segundo plano
             if (users[targetId]) {
                 initFirebase().then(async () => {
                     if (fbDb && fsModRef) {
@@ -886,6 +1565,9 @@
                             const snap = await fsModRef.getDoc(fsModRef.doc(fbDb, 'users', targetId));
                             if (snap.exists()) {
                                 const cloudData = snap.data();
+                                if (!cloudData.customAvatar && isGoogleDefaultPhotoUrl(cloudData.avatar)) {
+                                    cloudData.avatar = DEFAULT_AVATAR;
+                                }
                                 cacheUserProfileLocally(cloudData);
                                 if (targetId === localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID)) {
                                     applyProfileToDOMSynchronously(cloudData);
@@ -897,7 +1579,6 @@
                 return users[targetId];
             }
 
-            // Si es un usuario nuevo que no estaba en caché local, consultarlo en Firestore
             await initFirebase();
             if (fbDb && fsModRef) {
                 try {
@@ -905,6 +1586,9 @@
                     const snap = await fsModRef.getDoc(userRef);
                     if (snap.exists()) {
                         const data = snap.data();
+                        if (!data.customAvatar && isGoogleDefaultPhotoUrl(data.avatar)) {
+                            data.avatar = DEFAULT_AVATAR;
+                        }
                         cacheUserProfileLocally(data);
                         return data;
                     } else if (currentAuthUser && targetId === currentAuthUser.uid) {
@@ -926,7 +1610,6 @@
             const updatedProfile = { ...currentProfile, ...updates };
             cacheUserProfileLocally(updatedProfile);
 
-            // Actualizar inmediatamente también el caché local de posts
             if (updates.username || updates.avatar) {
                 const posts = getStoredJSON(STORAGE_KEYS.POSTS, SEED_POSTS);
                 let changed = false;
@@ -949,7 +1632,6 @@
                 if (changed) setStoredJSON(STORAGE_KEYS.POSTS, posts);
             }
 
-            // Sincronizar con Firestore
             await initFirebase();
             if (fbDb && fsModRef) {
                 try {
@@ -1056,8 +1738,6 @@
         // ==========================================
         async getPosts(filterAuthorId = null) {
             const cachedPosts = getStoredJSON(STORAGE_KEYS.POSTS, SEED_POSTS);
-
-            // Disparar sincronización en segundo plano sin bloquear el renderizado (0ms)
             initFirebase().then(() => syncPostsFromFirestoreInBackground());
 
             if (filterAuthorId) {
@@ -1084,7 +1764,7 @@
                 id: 'post_' + Date.now(),
                 authorId: user.id,
                 authorUsername: user.username,
-                authorAvatar: user.avatar || DEFAULT_AVATAR,
+                authorAvatar: (user.customAvatar && user.avatar) ? user.avatar : DEFAULT_AVATAR,
                 createdAt: Date.now(),
                 content: content || '',
                 media: media || null,
@@ -1246,7 +1926,7 @@
                 id: 'comment_' + Date.now(),
                 authorId: user.id,
                 authorUsername: user.username,
-                authorAvatar: user.avatar || DEFAULT_AVATAR,
+                authorAvatar: (user.customAvatar && user.avatar) ? user.avatar : DEFAULT_AVATAR,
                 text: commentText.trim(),
                 createdAt: Date.now()
             };

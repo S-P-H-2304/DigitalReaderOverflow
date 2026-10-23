@@ -48,7 +48,7 @@
                 <div class="settings-panels-content" data-field="bio">
                     <h2>Descripción</h2>
                     <div class="settings-icon-container">
-                        <p style="max-width: 11rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">—</p>
+                        <p>—</p>
                         <svg class="settings-icon" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M0.21967 10.8269C0.512589 11.1193 0.987468 11.1196 1.28022 10.8269L6.05268 6.05345C6.34557 5.76056 6.34557 5.2858 6.05268 4.9929L1.28022 0.219467C0.987467 -0.0732518 0.512588 -0.072979 0.219669 0.219467C-0.0732243 0.512361 -0.0732242 0.988097 0.219669 1.28099L4.46186 5.52318L0.21967 9.76537C-0.0732234 10.0583 -0.0732234 10.534 0.21967 10.8269Z" fill="#D4DBE4"/>
                         </svg>
@@ -85,7 +85,7 @@
                         </svg>
                     </div>
                 </div>
-                <div class="settings-panels-content" data-field="password">
+                <div class="settings-panels-content" data-field="password" id="settings-password-row">
                     <h2>Contraseña</h2>
                     <div class="settings-icon-container">
                         <p>*******</p>
@@ -108,10 +108,14 @@
         <!-- Pop up para editar datos de configuración -->
         <div class="confirm-backdrop" id="edit-backdrop">
             <article class="confirm-overlay-container">
-                <div class="confirm-overlay-content">
+                <div class="confirm-overlay-content" id="edit-overlay-content">
                     <h2 id="edit-field-title">Editar campo</h2>
                     <div class="edit-input-wrapper">
                         <input type="text" id="edit-field-input" class="edit-modal-input" placeholder="Ingresa un nuevo valor" autocomplete="off" />
+                        <textarea id="edit-field-textarea" class="edit-modal-input edit-modal-textarea" rows="6" maxlength="200" placeholder="Escribe tu descripción (máx. 200 caracteres)..." style="display: none;"></textarea>
+                        <div id="edit-bio-counter" class="edit-bio-counter" style="display: none;">0 / 200</div>
+                        <input type="password" id="edit-field-confirm-password" class="edit-modal-input" placeholder="Confirmar nueva contraseña" autocomplete="new-password" enterkeyhint="done" style="display: none; margin-top: 0.75rem;" />
+                        <p id="edit-field-error" class="edit-modal-error" role="alert" style="display: none;"></p>
                     </div>
                     <div class="confirm-overlay-selection">
                         <div id="btn-cancelar-edit" style="cursor: pointer;">
@@ -155,4 +159,3 @@
     <script src="Scripts/log-out.js"></script>
 </body>
 </html>
-

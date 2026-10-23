@@ -1,10 +1,11 @@
 /**
- * Overflow Profile Management (profile.js)
- * Conectado con Scripts/db.js (LocalStorage desacoplado listo para Firebase).
+ * Overflow Profile & Tabs (profile.js)
+ * Conectado con Scripts/db.js (Cloud Firestore + Caché local).
+ * Incluye Modo Edición de Imágenes (#edit-profile) e Inspección en Modo Normal (Lightbox).
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // --- 0. NAVEGACIÓN BÁSICA ---
+    // --- 0. NAVEGACIÓN DE CABECERA ---
     const btnVolver = document.getElementById('overlay-publish');
     if (btnVolver) {
         btnVolver.addEventListener('click', () => {
@@ -16,23 +17,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    const btnEditProfile = document.getElementById('edit-profile');
-    if (btnEditProfile) {
-        btnEditProfile.addEventListener('click', () => {
-            window.location.href = 'settings.html';
-        });
-    }
+    if (!window.DB) return;
 
-    // --- 1. ELEMENTOS DE PERFIL ---
+    // --- 1. REFERENCIAS DE ELEMENTOS ---
+    const profileMain = document.getElementById('myprofile-main') || document.querySelector('.profile-container');
+    const btnEditProfile = document.getElementById('edit-profile');
+    const editHint = document.getElementById('profile-edit-hint');
     const profileAvatar = document.getElementById('profile-avatar');
     const profileBanner = document.getElementById('profile-banner');
+    const badgeEditAvatar = document.getElementById('badge-edit-avatar');
+    const badgeEditBanner = document.getElementById('badge-edit-banner');
     const avatarFileInput = document.getElementById('avatar-file-input');
     const bannerFileInput = document.getElementById('banner-file-input');
     const profileUsername = document.getElementById('profile-username');
     const profileBio = document.getElementById('profile-bio');
-    const followersCount = document.getElementById('profile-followers-count');
-    const followingCount = document.getElementById('profile-following-count');
+    const followersCountElem = document.getElementById('profile-followers-count');
+    const followingCountElem = document.getElementById('profile-following-count');
     const feedContainer = document.getElementById('profile-feed-container');
+    const btnCrearPost = document.querySelector('.bottom-nav-action-wrapper .add-publish');
+
+    // Lightbox de inspección
+    const lightboxBackdrop = document.getElementById('image-lightbox-backdrop');
+    const lightboxImg = document.getElementById('image-lightbox-img');
+    const btnCloseLightbox = document.getElementById('btn-close-lightbox');
 
     // Tabs
     const btnPosts = document.getElementById('tab-posts');
@@ -48,62 +55,159 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let currentTab = 'posts'; // 'posts' | 'reposts'
     let activeCommentPostId = null;
+    let isEditingPhotos = false;
 
-    if (!window.DB) return;
-
-    // --- 2. VERIFICACIÓN DE SESIÓN Y CARGA DE PERFIL EN LA NUBE ---
-    const currentUser = await window.DB.requireAuth();
-    if (currentUser) {
-        if (profileAvatar && currentUser.avatar) {
-            profileAvatar.referrerPolicy = 'no-referrer';
-            profileAvatar.src = currentUser.avatar;
-        }
-        if (profileBanner && currentUser.banner) profileBanner.src = currentUser.banner;
-        if (profileUsername) profileUsername.textContent = currentUser.username;
-        if (profileBio) profileBio.textContent = currentUser.bio || '';
-        if (followersCount) followersCount.textContent = currentUser.followersCount || 0;
-        if (followingCount) followingCount.textContent = currentUser.followingCount || 0;
+    if (btnCrearPost) {
+        btnCrearPost.addEventListener('click', () => {
+            window.location.href = 'community.html';
+        });
     }
 
-    // --- 3. ACTUALIZACIÓN DE FOTOS (AVATAR Y PORTADA) ---
+    // --- 2. MODO EDICIÓN VS MODO NORMAL (INSPECCIÓN LIGHTBOX) ---
+    function setPhotoEditMode(enabled) {
+        isEditingPhotos = Boolean(enabled);
+        if (profileMain) {
+            profileMain.classList.toggle('is-editing-photos', isEditingPhotos);
+        }
+        if (btnEditProfile) {
+            btnEditProfile.classList.toggle('active-edit-mode', isEditingPhotos);
+            btnEditProfile.setAttribute('aria-pressed', isEditingPhotos ? 'true' : 'false');
+            const iconPencil = btnEditProfile.querySelector('.icon-pencil');
+            const iconCheck = btnEditProfile.querySelector('.icon-check');
+            if (iconPencil) iconPencil.style.display = isEditingPhotos ? 'none' : '';
+            if (iconCheck) iconCheck.style.display = isEditingPhotos ? 'block' : 'none';
+        }
+        if (editHint) {
+            editHint.classList.toggle('is-visible', isEditingPhotos);
+        }
+        if (profileAvatar) {
+            profileAvatar.title = isEditingPhotos ? 'Toca para cambiar foto de perfil' : 'Toca para inspeccionar foto de perfil';
+        }
+        if (profileBanner) {
+            profileBanner.title = isEditingPhotos ? 'Toca para cambiar portada' : 'Toca para inspeccionar portada';
+        }
+    }
+
+    function openImageLightbox(src, altText) {
+        if (!lightboxBackdrop || !lightboxImg || !src) return;
+        lightboxImg.src = src;
+        lightboxImg.alt = altText || 'Imagen de perfil';
+        lightboxBackdrop.classList.add('active');
+        lightboxBackdrop.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeImageLightbox() {
+        if (!lightboxBackdrop) return;
+        lightboxBackdrop.classList.remove('active');
+        lightboxBackdrop.setAttribute('aria-hidden', 'true');
+    }
+
+    if (btnCloseLightbox) {
+        btnCloseLightbox.addEventListener('click', closeImageLightbox);
+    }
+    if (lightboxBackdrop) {
+        lightboxBackdrop.addEventListener('click', (e) => {
+            if (e.target === lightboxBackdrop) closeImageLightbox();
+        });
+    }
+
+    if (btnEditProfile) {
+        btnEditProfile.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setPhotoEditMode(!isEditingPhotos);
+            if (window.Motion && window.Motion.popReaderControl) {
+                window.Motion.popReaderControl(btnEditProfile);
+            }
+        });
+    }
+
+    // --- 3. CARGAR DATOS DEL PERFIL DESDE FIRESTORE ---
+    async function loadProfileHeader() {
+        const user = await window.DB.requireAuth();
+        if (!user) return;
+
+        if (profileAvatar) {
+            profileAvatar.referrerPolicy = 'no-referrer';
+            profileAvatar.src = user.avatar || window.DB.DEFAULT_AVATAR;
+        }
+        if (profileBanner) profileBanner.src = user.banner || window.DB.DEFAULT_BANNER;
+        if (profileUsername) profileUsername.textContent = user.username || 'Perfil';
+        if (profileBio) profileBio.textContent = (user.bio || '').slice(0, 200);
+        if (followersCountElem) followersCountElem.textContent = user.followersCount || 0;
+        if (followingCountElem) followingCountElem.textContent = user.followingCount || 0;
+    }
+
+    // --- 4. CAMBIAR AVATAR Y BANNER (SOLO EN MODO EDICIÓN) O INSPECCIONAR (MODO NORMAL) ---
     if (profileAvatar && avatarFileInput) {
-        profileAvatar.addEventListener('click', () => avatarFileInput.click());
+        profileAvatar.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (isEditingPhotos) {
+                avatarFileInput.click();
+            } else {
+                openImageLightbox(profileAvatar.src, 'Foto de perfil');
+            }
+        });
+
+        if (badgeEditAvatar) {
+            badgeEditAvatar.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (isEditingPhotos) {
+                    avatarFileInput.click();
+                }
+            });
+        }
 
         avatarFileInput.addEventListener('change', async (e) => {
             const file = e.target.files && e.target.files[0];
             if (!file) return;
-
             try {
                 const base64 = await window.DB.compressImage(file, 400, 0.75);
-                await window.DB.updateProfile({ avatar: base64 });
+                await window.DB.updateProfile({ avatar: base64, customAvatar: true });
                 profileAvatar.src = base64;
+                setPhotoEditMode(false);
                 await renderProfileFeed();
             } catch (err) {
-                alert('Error al actualizar avatar: ' + err.message);
+                alert('Error al actualizar el avatar: ' + err.message);
             }
             avatarFileInput.value = '';
         });
     }
 
     if (profileBanner && bannerFileInput) {
-        profileBanner.addEventListener('click', () => bannerFileInput.click());
+        profileBanner.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (isEditingPhotos) {
+                bannerFileInput.click();
+            } else {
+                openImageLightbox(profileBanner.src, 'Portada de perfil');
+            }
+        });
+
+        if (badgeEditBanner) {
+            badgeEditBanner.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (isEditingPhotos) {
+                    bannerFileInput.click();
+                }
+            });
+        }
 
         bannerFileInput.addEventListener('change', async (e) => {
             const file = e.target.files && e.target.files[0];
             if (!file) return;
-
             try {
                 const base64 = await window.DB.compressImage(file, 900, 0.75);
-                await window.DB.updateProfile({ banner: base64 });
+                await window.DB.updateProfile({ banner: base64, customBanner: true });
                 profileBanner.src = base64;
+                setPhotoEditMode(false);
             } catch (err) {
-                alert('Error al actualizar portada: ' + err.message);
+                alert('Error al actualizar el banner: ' + err.message);
             }
             bannerFileInput.value = '';
         });
     }
 
-    // --- 4. CONTROL DE PESTAÑAS (POSTS VS REPOSTS) ---
+    // --- 5. TABS (POSTS VS REPOSTS) ---
     if (btnPosts && btnReposts && activePill) {
         btnPosts.addEventListener('click', async () => {
             if (currentTab === 'posts') return;
@@ -124,7 +228,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // --- 5. RENDERIZADO DEL FEED DE PERFIL ---
+    // --- 6. SVGS DE INTERACCIÓN ---
     const SVG_LIKE = `<svg class="interaction-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M4.30643 7.04996L7.15158 0.75C7.71751 0.75 8.26027 0.971248 8.66044 1.36507C9.06062 1.7589 9.28544 2.29304 9.28544 2.84999V5.64997H13.3113C13.5175 5.64767 13.7218 5.68952 13.9099 5.77262C14.0981 5.85572 14.2656 5.97808 14.4009 6.13123C14.5362 6.28437 14.6361 6.46464 14.6936 6.65954C14.7511 6.85444 14.7648 7.05931 14.7339 7.25996L13.7523 13.5599C13.7009 13.8937 13.5286 14.198 13.2672 14.4167C13.0057 14.6354 12.6728 14.7537 12.3297 14.7499H4.30643M4.30643 7.04996V14.7499M4.30643 7.04996H2.17257C1.79528 7.04996 1.43345 7.19746 1.16666 7.46001C0.899878 7.72256 0.75 8.07865 0.75 8.44995V13.3499C0.75 13.7212 0.899878 14.0773 1.16666 14.3399C1.43345 14.6024 1.79528 14.7499 2.17257 14.7499H4.30643" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>`;
@@ -154,10 +258,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             .replace(/'/g, "&#039;");
     }
 
+    // --- 7. RENDERIZADO DEL FEED DEL PERFIL ---
     async function renderProfileFeed() {
         if (!feedContainer) return;
-        const currentUserId = await window.DB.getCurrentUserId();
 
+        const currentUserId = await window.DB.getCurrentUserId();
         let posts = [];
         if (currentTab === 'posts') {
             posts = await window.DB.getPosts(currentUserId);
@@ -166,9 +271,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (posts.length === 0) {
-            const emptyMsg = currentTab === 'posts' 
-                ? 'No has publicado nada aún.' 
-                : 'No has reposteado ninguna publicación todavía.';
+            const emptyMsg = currentTab === 'posts'
+                ? 'Aún no has publicado nada en la comunidad.'
+                : 'Aún no has reposteado ninguna publicación.';
             feedContainer.innerHTML = `
                 <div style="text-align: center; padding: 2.5rem 1rem; color: var(--on-surface);">
                     <p>${emptyMsg}</p>
@@ -187,6 +292,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const repostsCount = Array.isArray(post.reposts) ? post.reposts.length : 0;
             const timeStr = window.DB.timeAgo(post.createdAt);
 
+            const profileLink = (post.authorId === currentUserId)
+                ? 'myprofile.html'
+                : `otherprofile.html?uid=${encodeURIComponent(post.authorId)}`;
+
             let mediaHtml = '';
             if (post.media && post.media.url) {
                 mediaHtml = `
@@ -199,8 +308,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             return `
                 <article class="community-card-cta-container post-card" data-post-id="${post.id}">
                     <div class="community-card-cta-header">
-                        <img class="community-card-profile-icon" src="${post.authorAvatar || 'Images/default-avatar.svg'}" alt="${post.authorUsername}" referrerpolicy="no-referrer" style="border-radius: 50%; object-fit: cover;">
-                        <span class="post-username-text" style="font-weight: bold;">${post.authorUsername}</span>
+                        <a href="${profileLink}" class="post-author-link">
+                            <img class="community-card-profile-icon" src="${post.authorAvatar || 'Images/default-avatar.svg'}" alt="${post.authorUsername}" referrerpolicy="no-referrer" style="border-radius: 50%; object-fit: cover;">
+                        </a>
+                        <a href="${profileLink}" class="post-author-name">
+                            <span class="post-username-text">${post.authorUsername}</span>
+                        </a>
                         <div class="dot"></div>
                         <span class="post-time-text">${timeStr}</span>
                     </div>
@@ -239,7 +352,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     function attachPostListeners() {
         if (!feedContainer) return;
 
-        // Likes
         feedContainer.querySelectorAll('.btn-like').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.stopPropagation();
@@ -263,7 +375,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         });
 
-        // Dislikes
         feedContainer.querySelectorAll('.btn-dislike').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.stopPropagation();
@@ -287,7 +398,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         });
 
-        // Reposts
         feedContainer.querySelectorAll('.btn-repost').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.stopPropagation();
@@ -295,20 +405,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const res = await window.DB.toggleRepost(postId);
                 if (!res) return;
 
-                btn.querySelector('.count-repost').textContent = res.repostsCount;
-                btn.classList.toggle('active-repost', res.hasReposted);
-
-                if (res.hasReposted && window.Motion) {
-                    window.Motion.spinRepost(btn);
-                }
-
                 if (currentTab === 'reposts') {
                     await renderProfileFeed();
+                } else {
+                    btn.querySelector('.count-repost').textContent = res.repostsCount;
+                    btn.classList.toggle('active-repost', res.hasReposted);
+                    if (res.hasReposted && window.Motion) {
+                        window.Motion.spinRepost(btn);
+                    }
                 }
             });
         });
 
-        // Comentarios
         feedContainer.querySelectorAll('.btn-comment').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -321,7 +429,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // --- 6. MODAL DE COMENTARIOS ---
+    // --- 8. MODAL DE COMENTARIOS ---
     async function openCommentsModal(postId) {
         if (!commentsBackdrop) return;
         activeCommentPostId = postId;
@@ -419,8 +527,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && commentsBackdrop && commentsBackdrop.classList.contains('active')) {
-            closeCommentsModal();
+        if (e.key === 'Escape') {
+            if (lightboxBackdrop && lightboxBackdrop.classList.contains('active')) {
+                closeImageLightbox();
+            }
+            if (commentsBackdrop && commentsBackdrop.classList.contains('active')) {
+                closeCommentsModal();
+            }
+            if (isEditingPhotos) {
+                setPhotoEditMode(false);
+            }
         }
     });
 
@@ -428,6 +544,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderProfileFeed();
     });
 
-    // Render inicial
+    // Carga inicial
+    await loadProfileHeader();
     await renderProfileFeed();
 });

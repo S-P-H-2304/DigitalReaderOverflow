@@ -1,6 +1,6 @@
 /**
  * Overflow Other Profile Viewer & Following System (otherprofile.js)
- * Conectado con Scripts/db.js (LocalStorage desacoplado listo para Firebase).
+ * Conectado con Scripts/db.js (Firestore + Caché local).
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -31,6 +31,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const followLabel = document.getElementById('follow-label');
     const feedContainer = document.getElementById('profile-feed-container');
 
+    // Lightbox de inspección
+    const lightboxBackdrop = document.getElementById('image-lightbox-backdrop');
+    const lightboxImg = document.getElementById('image-lightbox-img');
+    const btnCloseLightbox = document.getElementById('btn-close-lightbox');
+
     // Tabs
     const btnPosts = document.getElementById('tab-posts');
     const btnReposts = document.getElementById('tab-reposts');
@@ -45,6 +50,35 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let currentTab = 'posts';
     let activeCommentPostId = null;
+
+    function openImageLightbox(src, altText) {
+        if (!lightboxBackdrop || !lightboxImg || !src) return;
+        lightboxImg.src = src;
+        lightboxImg.alt = altText || 'Imagen de perfil';
+        lightboxBackdrop.classList.add('active');
+        lightboxBackdrop.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeImageLightbox() {
+        if (!lightboxBackdrop) return;
+        lightboxBackdrop.classList.remove('active');
+        lightboxBackdrop.setAttribute('aria-hidden', 'true');
+    }
+
+    if (btnCloseLightbox) {
+        btnCloseLightbox.addEventListener('click', closeImageLightbox);
+    }
+    if (lightboxBackdrop) {
+        lightboxBackdrop.addEventListener('click', (e) => {
+            if (e.target === lightboxBackdrop) closeImageLightbox();
+        });
+    }
+    if (otherAvatar) {
+        otherAvatar.addEventListener('click', () => openImageLightbox(otherAvatar.src, 'Avatar de usuario'));
+    }
+    if (otherBanner) {
+        otherBanner.addEventListener('click', () => openImageLightbox(otherBanner.src, 'Portada de usuario'));
+    }
 
     // --- 2. CARGAR PERFIL DE USUARIO VISITADO DESDE FIRESTORE ---
     async function loadTargetProfile() {
@@ -62,7 +96,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             if (otherBanner && targetUser.banner) otherBanner.src = targetUser.banner;
             if (otherUsername) otherUsername.textContent = targetUser.username;
-            if (otherBio) otherBio.textContent = targetUser.bio || '';
+            if (otherBio) otherBio.textContent = (targetUser.bio || '').slice(0, 200);
             if (followersCountElem) followersCountElem.textContent = targetUser.followersCount || 0;
             if (followingCountElem) followingCountElem.textContent = targetUser.followingCount || 0;
         }
@@ -161,8 +195,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (posts.length === 0) {
-            const emptyMsg = currentTab === 'posts' 
-                ? 'Este usuario no tiene publicaciones aún.' 
+            const emptyMsg = currentTab === 'posts'
+                ? 'Este usuario no tiene publicaciones aún.'
                 : 'Este usuario no tiene reposts aún.';
             feedContainer.innerHTML = `
                 <div style="text-align: center; padding: 2.5rem 1rem; color: var(--on-surface);">
@@ -234,7 +268,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     function attachPostListeners() {
         if (!feedContainer) return;
 
-        // Likes
         feedContainer.querySelectorAll('.btn-like').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.stopPropagation();
@@ -258,7 +291,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         });
 
-        // Dislikes
         feedContainer.querySelectorAll('.btn-dislike').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.stopPropagation();
@@ -282,7 +314,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         });
 
-        // Reposts
         feedContainer.querySelectorAll('.btn-repost').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.stopPropagation();
@@ -299,7 +330,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         });
 
-        // Comentarios
         feedContainer.querySelectorAll('.btn-comment').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -410,8 +440,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && commentsBackdrop && commentsBackdrop.classList.contains('active')) {
-            closeCommentsModal();
+        if (e.key === 'Escape') {
+            if (lightboxBackdrop && lightboxBackdrop.classList.contains('active')) {
+                closeImageLightbox();
+            }
+            if (commentsBackdrop && commentsBackdrop.classList.contains('active')) {
+                closeCommentsModal();
+            }
         }
     });
 

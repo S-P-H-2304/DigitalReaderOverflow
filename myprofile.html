@@ -26,17 +26,38 @@
                 <path d="M1.5 1.50001L12.5309 12.5309M1.5 12.5309L12.5309 1.50001" stroke="#D4DBE4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
         </button>
-        <button type="button" class="add-publish" id="edit-profile" aria-label="Editar perfil">
-            <svg class="close-overlay" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <button type="button" class="add-publish" id="edit-profile" aria-label="Activar modo edición de fotos" aria-pressed="false">
+            <svg class="close-overlay icon-pencil" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path d="M16.0666 0.182989C15.9494 0.0658213 15.7904 0 15.6247 0C15.459 0 15.3 0.0658213 15.1828 0.182989L13.1242 2.24171L17.7577 6.87541L19.8164 4.81793C19.8746 4.75987 19.9208 4.69091 19.9523 4.61498C19.9838 4.53905 20 4.45764 20 4.37544C20 4.29323 19.9838 4.21183 19.9523 4.1359C19.9208 4.05997 19.8746 3.991 19.8164 3.93294L16.0666 0.182989ZM16.874 7.75914L12.2405 3.12545L4.11583 11.2504H4.37457C4.54032 11.2504 4.69928 11.3162 4.81649 11.4334C4.93369 11.5506 4.99954 11.7096 4.99954 11.8753V12.5003H5.62451C5.79026 12.5003 5.94923 12.5662 6.06643 12.6834C6.18364 12.8006 6.24948 12.9596 6.24948 13.1253V13.7503H6.87446C7.04021 13.7503 7.19917 13.8162 7.31638 13.9334C7.43358 14.0506 7.49943 14.2096 7.49943 14.3753V15.0003H8.1244C8.29015 15.0003 8.44912 15.0662 8.56632 15.1834C8.68353 15.3006 8.74937 15.4595 8.74937 15.6253V15.884L16.874 7.75914ZM7.53943 17.094C7.51313 17.0241 7.49958 16.95 7.49943 16.8753V16.2503H6.87446C6.7087 16.2503 6.54974 16.1844 6.43253 16.0672C6.31533 15.95 6.24948 15.7911 6.24948 15.6253V15.0003H5.62451C5.45876 15.0003 5.29979 14.9345 5.18259 14.8172C5.06538 14.7 4.99954 14.5411 4.99954 14.3753V13.7503H4.37457C4.20881 13.7503 4.04985 13.6845 3.93264 13.5673C3.81544 13.4501 3.74959 13.2911 3.74959 13.1253V12.5003H3.12462C3.0499 12.5002 2.97582 12.4866 2.90588 12.4603L2.68214 12.6828C2.62258 12.7428 2.57581 12.8143 2.54465 12.8928L0.0447556 19.1428C-0.000705711 19.2563 -0.0118346 19.3808 0.0127486 19.5006C0.0373319 19.6204 0.0965462 19.7304 0.18305 19.8169C0.269555 19.9035 0.379545 19.9627 0.499385 19.9872C0.619225 20.0118 0.743645 20.0007 0.85722 19.9552L7.10695 17.4553C7.18552 17.4241 7.25696 17.3773 7.31694 17.3178L7.53943 17.094Z" fill="#D4DBE4"/>
+            </svg>
+            <svg class="close-overlay icon-check" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display: none;">
+                <path d="M20 6L9 17L4 12" stroke="#2ED573" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
         </button>
     </header>
-    <main class="profile-container">
+    <main class="profile-container" id="myprofile-main">
+        <div class="profile-edit-mode-hint" id="profile-edit-hint" role="status" aria-live="polite">
+            <span>Modo edición: toca tu foto o portada para cambiarla</span>
+        </div>
         <article class="banner-info-container">
-            <div class="banner-container">
-                <img id="profile-banner" class="banner-img photo-editable" src="Images/default-banner.svg" alt="Banner de perfil" title="Toca para cambiar portada">
-                <img id="profile-avatar" class="profile-pic photo-editable" src="Images/default-avatar.svg" alt="Foto de perfil" title="Toca para cambiar avatar" referrerpolicy="no-referrer">
+            <div class="banner-container" id="profile-banner-wrapper">
+                <img id="profile-banner" class="banner-img photo-editable" src="Images/default-banner.svg" alt="Banner de perfil" title="Toca para ver portada">
+                <button type="button" class="photo-edit-badge photo-edit-badge-banner" id="badge-edit-banner" aria-label="Cambiar imagen de portada" tabindex="-1">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    <span>Cambiar portada</span>
+                </button>
+                <div class="avatar-edit-wrapper">
+                    <img id="profile-avatar" class="profile-pic photo-editable" src="Images/default-avatar.svg" alt="Foto de perfil" title="Toca para ver foto de perfil" referrerpolicy="no-referrer">
+                    <button type="button" class="photo-edit-badge photo-edit-badge-avatar" id="badge-edit-avatar" aria-label="Cambiar foto de perfil" tabindex="-1">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                    </button>
+                </div>
             </div>
             <input type="file" id="avatar-file-input" accept="image/*" style="display: none;">
             <input type="file" id="banner-file-input" accept="image/*" style="display: none;">
@@ -113,6 +134,12 @@
             </nav>
     </main>
 
+    <!-- Visor / Lightbox para inspeccionar imágenes en modo normal -->
+    <div id="image-lightbox-backdrop" class="image-lightbox-backdrop" role="dialog" aria-modal="true" aria-label="Vista previa de imagen" aria-hidden="true">
+        <button type="button" id="btn-close-lightbox" class="image-lightbox-close" aria-label="Cerrar vista previa">&times;</button>
+        <img id="image-lightbox-img" class="image-lightbox-img" src="" alt="Imagen ampliada" referrerpolicy="no-referrer">
+    </div>
+
     <!-- Modal de Comentarios -->
     <div id="comments-backdrop" class="comments-modal-backdrop">
         <div class="comments-modal-sheet">
@@ -142,4 +169,3 @@
     <script src="Scripts/profile.js"></script>
 </body>
 </html>
-

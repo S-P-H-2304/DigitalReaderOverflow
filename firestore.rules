@@ -7,18 +7,23 @@ rules_version = '2';
 // This security rules file assumes the following data structures:
 //
 // Collection: users
-// Document ID: {userId} (Firebase Auth UID or seed IDs: 'user_mclovin', 'user_other')
+// Document ID: {userId} (Firebase Auth UID or custom/seed IDs matching 'user_*')
 // Fields:
 //   - id: string (required, immutable, max 128 chars) - Document / User ID
 //   - username: string (required, 1..60 chars) - Display username
 //   - nombres: string (optional, 0..100 chars) - First name(s)
 //   - apellidos: string (optional, 0..100 chars) - Last name(s)
 //   - email: string (optional, 0..254 chars) - User email address
-//   - password: string (optional, 0..100 chars) - Masked password placeholder
+//   - password: string (optional, 0..100 chars) - Password or masked placeholder
+//   - authProvider: string (optional, 0..20 chars) - Auth provider ('google' or 'password')
+//   - usernameConfirmed: bool (optional) - Whether Google user confirmed initial username
+//   - customAvatar: bool (optional) - Whether user uploaded a custom avatar
+//   - customBanner: bool (optional) - Whether user uploaded a custom banner
 //   - bio: string (optional, 0..1000 chars) - Profile biography
 //   - avatar: string (optional, 0..800000 chars) - Avatar image path, URL, or compressed Base64 data URL
 //   - banner: string (optional, 0..800000 chars) - Banner image path, URL, or compressed Base64 data URL
 //   - activeChapter: string (optional, 0..20 chars) - Active chapter theme ID
+//   - chapterProgress: map (optional, max 100 entries) - Per-chapter reading progress
 //   - notificationsEnabled: bool (optional) - Notification preference toggle
 //   - volume: number (optional, 0..100) - Reader volume preference
 //   - followersCount: number (optional, >= 0) - Number of followers
@@ -49,6 +54,8 @@ rules_version = '2';
 //   - title: string (optional, 0..200 chars) - Chapter title
 //   - likes: list of strings (required, max 10000 items) - User IDs who liked the chapter
 //   - likesCount: number (required, >= 0) - Global chapter like counter
+//   - viewsCount: number (optional, >= 0) - Global chapter view counter
+//   - totalPanels: number (optional, >= 0) - Total panels in the chapter
 //
 // ===============================================================
 
@@ -132,6 +139,14 @@ service cloud.firestore {
              request.resource.data[field] is bool;
     }
 
+    // Validate optional map with max size
+    function isValidOptionalMap(field, maxKeys) {
+      return !(field in request.resource.data) ||
+             request.resource.data[field] == null ||
+             (request.resource.data[field] is map &&
+              request.resource.data[field].size() <= maxKeys);
+    }
+
     // Validate optional list with max size and basic element type check
     function isValidOptionalStringList(field, maxSize) {
       return !(field in request.resource.data) ||
@@ -179,8 +194,10 @@ service cloud.firestore {
     function isValidUser(data, userId) {
       let allowedFields = [
         'id', 'username', 'nombres', 'apellidos', 'email', 'password',
-        'bio', 'avatar', 'banner', 'activeChapter', 'notificationsEnabled',
-        'volume', 'followersCount', 'followingCount', 'following', 'reposts', 'createdAt'
+        'authProvider', 'usernameConfirmed', 'customAvatar', 'customBanner',
+        'bio', 'avatar', 'banner', 'activeChapter', 'chapterProgress',
+        'notificationsEnabled', 'volume', 'followersCount', 'followingCount',
+        'following', 'reposts', 'createdAt'
       ];
       return hasOnlyAllowedFields(allowedFields) &&
              hasRequiredFields(['id', 'username']) &&
@@ -191,10 +208,15 @@ service cloud.firestore {
              isValidOptionalString('apellidos', 0, 100) &&
              isValidOptionalString('email', 0, 254) &&
              isValidOptionalString('password', 0, 100) &&
+             isValidOptionalString('authProvider', 0, 20) &&
+             isValidOptionalBool('usernameConfirmed') &&
+             isValidOptionalBool('customAvatar') &&
+             isValidOptionalBool('customBanner') &&
              isValidOptionalString('bio', 0, 1000) &&
              isValidOptionalString('avatar', 0, 800000) &&
              isValidOptionalString('banner', 0, 800000) &&
              isValidOptionalString('activeChapter', 0, 20) &&
+             isValidOptionalMap('chapterProgress', 100) &&
              isValidOptionalBool('notificationsEnabled') &&
              isValidOptionalBoundedNumber('volume', 0, 100) &&
              isValidOptionalNonNegativeNumber('followersCount') &&
@@ -227,7 +249,7 @@ service cloud.firestore {
 
     function isValidChapter(data, chapterId) {
       let allowedFields = [
-        'id', 'title', 'likes', 'likesCount'
+        'id', 'title', 'likes', 'likesCount', 'viewsCount', 'totalPanels'
       ];
       return hasOnlyAllowedFields(allowedFields) &&
              hasRequiredFields(['id', 'likes', 'likesCount']) &&
@@ -237,7 +259,9 @@ service cloud.firestore {
              isValidOptionalStringList('likes', 10000) &&
              (data.likesCount is int || data.likesCount is float) &&
              data.likesCount >= 0 &&
-             data.likesCount <= 9999999999999;
+             data.likesCount <= 9999999999999 &&
+             isValidOptionalNonNegativeNumber('viewsCount') &&
+             isValidOptionalNonNegativeNumber('totalPanels');
     }
 
     // ===============================================================
@@ -248,18 +272,17 @@ service cloud.firestore {
       // Public read access so profiles (myprofile.html, otherprofile.html) and seed users can be viewed
       allow read: if true;
 
-      // Allowed if authenticated and creating own profile OR seeding initial demo users
-      allow create: if isAuthenticated() &&
-                       isValidUser(request.resource.data, userId) &&
-                       (isOwner(userId) || userId in ['user_other', 'user_mclovin']);
+      // Allowed for Google authenticated owner OR standalone custom/seed accounts ('user_*')
+      allow create: if isValidUser(request.resource.data, userId) &&
+                       (isOwner(userId) || userId.matches('^user_.*'));
 
-      // Owner can update their own profile fields; other authenticated users can update followersCount when following/unfollowing
-      allow update: if isAuthenticated() &&
-                       isValidUser(request.resource.data, userId) &&
+      // Owner or custom account ('user_*') can update profile fields; any user can update followersCount by +/- 1
+      allow update: if isValidUser(request.resource.data, userId) &&
                        idNotModified() &&
                        areImmutableFieldsUnchanged(['id', 'createdAt']) &&
                        (
                          isOwner(userId) ||
+                         userId.matches('^user_.*') ||
                          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followersCount']) &&
                           math.abs(request.resource.data.followersCount - resource.data.followersCount) <= 1)
                        );
@@ -271,21 +294,20 @@ service cloud.firestore {
       // Public read access so the community feed can be read
       allow read: if true;
 
-      // Allowed if authenticated where authorId matches auth UID, or seeding initial demo posts
-      allow create: if isAuthenticated() &&
-                       isValidPost(request.resource.data, postId) &&
-                       (request.resource.data.authorId == request.auth.uid ||
+      // Allowed for Google authenticated author, custom account ('user_*'), or initial seed posts
+      allow create: if isValidPost(request.resource.data, postId) &&
+                       ((isAuthenticated() && request.resource.data.authorId == request.auth.uid) ||
+                        request.resource.data.authorId.matches('^user_.*') ||
                         postId in ['post_1001', 'post_1002']);
 
-      // Any authenticated user can update reaction/comment lists, OR post author can update content/author metadata
-      allow update: if isAuthenticated() &&
-                       isValidPost(request.resource.data, postId) &&
+      // Any user can update reaction/comment lists, OR post author / custom account can update content/author metadata
+      allow update: if isValidPost(request.resource.data, postId) &&
                        idNotModified() &&
                        areImmutableFieldsUnchanged(['id', 'authorId', 'createdAt']) &&
                        (
                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'dislikes', 'reposts', 'comments']) ||
-                         (isPostAuthor() &&
-                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['authorUsername', 'authorAvatar', 'content', 'media', 'likes', 'dislikes', 'reposts', 'comments']))
+                         isPostAuthor() ||
+                         resource.data.authorId.matches('^user_.*')
                        );
 
       // Only the post author can delete their post
@@ -293,16 +315,14 @@ service cloud.firestore {
     }
 
     match /chapters/{chapterId} {
-      // Public read access so any reader can see the global chapter like count
+      // Public read access so any reader can see the global chapter like and view counts
       allow read: if true;
 
-      // Authenticated users can create or seed chapter documents with valid schema
-      allow create: if isAuthenticated() &&
-                       isValidChapter(request.resource.data, chapterId);
+      // Allow creating/seeding chapter documents with valid schema
+      allow create: if isValidChapter(request.resource.data, chapterId);
 
-      // Authenticated users can update chapter likes and likesCount while preserving immutable id
-      allow update: if isAuthenticated() &&
-                       isValidChapter(request.resource.data, chapterId) &&
+      // Allow updating chapter likes, likesCount, viewsCount, and totalPanels while preserving immutable id
+      allow update: if isValidChapter(request.resource.data, chapterId) &&
                        idNotModified();
 
       allow delete: if false;
