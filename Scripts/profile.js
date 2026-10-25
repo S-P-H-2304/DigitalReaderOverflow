@@ -31,10 +31,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     const bannerFileInput = document.getElementById('banner-file-input');
     const profileUsername = document.getElementById('profile-username');
     const profileBio = document.getElementById('profile-bio');
+    const profileUsernameWrapper = document.getElementById('profile-username-wrapper');
+    const profileBioWrapper = document.getElementById('profile-bio-wrapper');
     const followersCountElem = document.getElementById('profile-followers-count');
     const followingCountElem = document.getElementById('profile-following-count');
     const feedContainer = document.getElementById('profile-feed-container');
     const btnCrearPost = document.querySelector('.bottom-nav-action-wrapper .add-publish');
+
+    // Modal de edición de nombre y descripción desde el perfil
+    const profileEditBackdrop = document.getElementById('profile-edit-backdrop');
+    const profileEditTitle = document.getElementById('profile-edit-title');
+    const profileEditInput = document.getElementById('profile-edit-input');
+    const profileEditTextarea = document.getElementById('profile-edit-textarea');
+    const profileEditBioCounter = document.getElementById('profile-edit-bio-counter');
+    const profileEditError = document.getElementById('profile-edit-error');
+    const btnCancelarProfileEdit = document.getElementById('btn-cancelar-profile-edit');
+    const btnGuardarProfileEdit = document.getElementById('btn-guardar-profile-edit');
+    let activeProfileEditField = null; // 'username' | 'bio'
 
     // Lightbox de inspección
     const lightboxBackdrop = document.getElementById('image-lightbox-backdrop');
@@ -86,6 +99,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (profileBanner) {
             profileBanner.title = isEditingPhotos ? 'Toca para cambiar portada' : 'Toca para inspeccionar portada';
         }
+        if (profileUsernameWrapper) {
+            profileUsernameWrapper.title = isEditingPhotos ? 'Toca para editar tu nombre de usuario' : '';
+        }
+        if (profileBioWrapper) {
+            profileBioWrapper.title = isEditingPhotos ? 'Toca para editar tu descripción' : '';
+        }
     }
 
     function openImageLightbox(src, altText) {
@@ -132,9 +151,175 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (profileBanner) profileBanner.src = user.banner || window.DB.DEFAULT_BANNER;
         if (profileUsername) profileUsername.textContent = user.username || 'Perfil';
-        if (profileBio) profileBio.textContent = (user.bio || '').slice(0, 200);
+        if (profileBio) {
+            const cleanBio = (user.bio || '').slice(0, 200);
+            profileBio.textContent = cleanBio;
+            profileBio.classList.toggle('is-empty-bio', !cleanBio);
+        }
         if (followersCountElem) followersCountElem.textContent = user.followersCount || 0;
         if (followingCountElem) followingCountElem.textContent = user.followingCount || 0;
+    }
+
+    // --- 3.5 EDITAR USERNAME Y DESCRIPCIÓN DESDE EL PERFIL (EN MODO EDICIÓN) ---
+    function showProfileEditError(msg) {
+        if (!profileEditError) return;
+        profileEditError.textContent = msg;
+        profileEditError.style.display = 'block';
+    }
+
+    function hideProfileEditError() {
+        if (!profileEditError) return;
+        profileEditError.textContent = '';
+        profileEditError.style.display = 'none';
+    }
+
+    async function openProfileTextEditModal(field) {
+        if (!isEditingPhotos || !profileEditBackdrop) return;
+        activeProfileEditField = field;
+        hideProfileEditError();
+        const user = await window.DB.getProfile();
+
+        if (field === 'username') {
+            if (profileEditTitle) profileEditTitle.textContent = 'Editar Username';
+            if (profileEditTextarea) profileEditTextarea.style.display = 'none';
+            if (profileEditBioCounter) profileEditBioCounter.style.display = 'none';
+            if (profileEditInput) {
+                profileEditInput.style.display = 'block';
+                profileEditInput.maxLength = 20;
+                profileEditInput.value = (user && user.username) ? user.username : (profileUsername ? profileUsername.textContent.trim() : '');
+                profileEditInput.placeholder = 'Ingresa tu nombre de usuario (3-20 caracteres)';
+            }
+            profileEditBackdrop.classList.add('active');
+            profileEditBackdrop.setAttribute('aria-hidden', 'false');
+            setTimeout(() => {
+                if (profileEditInput) {
+                    profileEditInput.focus();
+                    profileEditInput.select();
+                }
+            }, 90);
+        } else if (field === 'bio') {
+            if (profileEditTitle) profileEditTitle.textContent = 'Editar Descripción';
+            if (profileEditInput) profileEditInput.style.display = 'none';
+            if (profileEditTextarea) {
+                profileEditTextarea.style.display = 'block';
+                profileEditTextarea.rows = 6;
+                profileEditTextarea.maxLength = 200;
+                const currentBio = ((user && user.bio) ? user.bio : (profileBio ? profileBio.textContent.trim() : '')).slice(0, 200);
+                profileEditTextarea.value = currentBio;
+                if (profileEditBioCounter) {
+                    profileEditBioCounter.style.display = 'block';
+                    profileEditBioCounter.textContent = `${currentBio.length} / 200`;
+                }
+            }
+            profileEditBackdrop.classList.add('active');
+            profileEditBackdrop.setAttribute('aria-hidden', 'false');
+            setTimeout(() => {
+                if (profileEditTextarea) profileEditTextarea.focus();
+            }, 90);
+        }
+    }
+
+    function closeProfileTextEditModal() {
+        if (!profileEditBackdrop) return;
+        profileEditBackdrop.classList.remove('active');
+        profileEditBackdrop.setAttribute('aria-hidden', 'true');
+        activeProfileEditField = null;
+        hideProfileEditError();
+    }
+
+    async function saveProfileTextEdit() {
+        if (!activeProfileEditField) {
+            closeProfileTextEditModal();
+            return;
+        }
+        hideProfileEditError();
+
+        if (activeProfileEditField === 'username' && profileEditInput) {
+            const newUsername = profileEditInput.value.trim();
+            if (newUsername.length < 3 || newUsername.length > 20) {
+                showProfileEditError('El nombre de usuario debe tener entre 3 y 20 caracteres.');
+                return;
+            }
+            await window.DB.updateProfile({ username: newUsername });
+            if (profileUsername) profileUsername.textContent = newUsername;
+            closeProfileTextEditModal();
+            await renderProfileFeed();
+            return;
+        }
+
+        if (activeProfileEditField === 'bio' && profileEditTextarea) {
+            const newBio = profileEditTextarea.value.trim();
+            if (newBio.length > 200) {
+                showProfileEditError('La descripción no puede superar los 200 caracteres.');
+                return;
+            }
+            await window.DB.updateProfile({ bio: newBio });
+            if (profileBio) {
+                profileBio.textContent = newBio;
+                profileBio.classList.toggle('is-empty-bio', !newBio);
+            }
+            closeProfileTextEditModal();
+            return;
+        }
+    }
+
+    if (profileUsernameWrapper) {
+        profileUsernameWrapper.addEventListener('click', (e) => {
+            if (!isEditingPhotos) return;
+            e.stopPropagation();
+            openProfileTextEditModal('username');
+        });
+    }
+
+    if (profileBioWrapper) {
+        profileBioWrapper.addEventListener('click', (e) => {
+            if (!isEditingPhotos) return;
+            e.stopPropagation();
+            openProfileTextEditModal('bio');
+        });
+    }
+
+    if (btnCancelarProfileEdit) {
+        btnCancelarProfileEdit.addEventListener('click', closeProfileTextEditModal);
+    }
+
+    if (btnGuardarProfileEdit) {
+        btnGuardarProfileEdit.addEventListener('click', saveProfileTextEdit);
+    }
+
+    if (profileEditInput) {
+        profileEditInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveProfileTextEdit();
+            } else if (e.key === 'Escape') {
+                closeProfileTextEditModal();
+            }
+        });
+    }
+
+    if (profileEditTextarea) {
+        profileEditTextarea.addEventListener('input', () => {
+            if (profileEditTextarea.value.length > 200) {
+                profileEditTextarea.value = profileEditTextarea.value.slice(0, 200);
+            }
+            if (profileEditBioCounter) {
+                profileEditBioCounter.textContent = `${profileEditTextarea.value.length} / 200`;
+            }
+        });
+        profileEditTextarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeProfileTextEditModal();
+            }
+        });
+    }
+
+    if (profileEditBackdrop) {
+        profileEditBackdrop.addEventListener('click', (e) => {
+            if (e.target === profileEditBackdrop) {
+                closeProfileTextEditModal();
+            }
+        });
     }
 
     // --- 4. CAMBIAR AVATAR Y BANNER (SOLO EN MODO EDICIÓN) O INSPECCIONAR (MODO NORMAL) ---

@@ -23,7 +23,7 @@
     <header class="header">
         <button type="button" class="add-publish" id="overlay-publish" aria-label="Volver atrás">
             <svg class="close-overlay" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1.5 1.50001L12.5309 12.5309M1.5 12.5309L12.5309 1.50001" stroke="#D4DBE4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M1.5 1.50001L12.5309 12.5309M1.5 12.5309L12.5309 1.50001" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
         </button>
         <button type="button" class="add-publish" id="edit-profile" aria-label="Activar modo edición de fotos" aria-pressed="false">
@@ -31,13 +31,13 @@
                 <path d="M16.0666 0.182989C15.9494 0.0658213 15.7904 0 15.6247 0C15.459 0 15.3 0.0658213 15.1828 0.182989L13.1242 2.24171L17.7577 6.87541L19.8164 4.81793C19.8746 4.75987 19.9208 4.69091 19.9523 4.61498C19.9838 4.53905 20 4.45764 20 4.37544C20 4.29323 19.9838 4.21183 19.9523 4.1359C19.9208 4.05997 19.8746 3.991 19.8164 3.93294L16.0666 0.182989ZM16.874 7.75914L12.2405 3.12545L4.11583 11.2504H4.37457C4.54032 11.2504 4.69928 11.3162 4.81649 11.4334C4.93369 11.5506 4.99954 11.7096 4.99954 11.8753V12.5003H5.62451C5.79026 12.5003 5.94923 12.5662 6.06643 12.6834C6.18364 12.8006 6.24948 12.9596 6.24948 13.1253V13.7503H6.87446C7.04021 13.7503 7.19917 13.8162 7.31638 13.9334C7.43358 14.0506 7.49943 14.2096 7.49943 14.3753V15.0003H8.1244C8.29015 15.0003 8.44912 15.0662 8.56632 15.1834C8.68353 15.3006 8.74937 15.4595 8.74937 15.6253V15.884L16.874 7.75914ZM7.53943 17.094C7.51313 17.0241 7.49958 16.95 7.49943 16.8753V16.2503H6.87446C6.7087 16.2503 6.54974 16.1844 6.43253 16.0672C6.31533 15.95 6.24948 15.7911 6.24948 15.6253V15.0003H5.62451C5.45876 15.0003 5.29979 14.9345 5.18259 14.8172C5.06538 14.7 4.99954 14.5411 4.99954 14.3753V13.7503H4.37457C4.20881 13.7503 4.04985 13.6845 3.93264 13.5673C3.81544 13.4501 3.74959 13.2911 3.74959 13.1253V12.5003H3.12462C3.0499 12.5002 2.97582 12.4866 2.90588 12.4603L2.68214 12.6828C2.62258 12.7428 2.57581 12.8143 2.54465 12.8928L0.0447556 19.1428C-0.000705711 19.2563 -0.0118346 19.3808 0.0127486 19.5006C0.0373319 19.6204 0.0965462 19.7304 0.18305 19.8169C0.269555 19.9035 0.379545 19.9627 0.499385 19.9872C0.619225 20.0118 0.743645 20.0007 0.85722 19.9552L7.10695 17.4553C7.18552 17.4241 7.25696 17.3773 7.31694 17.3178L7.53943 17.094Z" fill="#D4DBE4"/>
             </svg>
             <svg class="close-overlay icon-check" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display: none;">
-                <path d="M20 6L9 17L4 12" stroke="#2ED573" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M20 6L9 17L4 12" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
         </button>
     </header>
     <main class="profile-container" id="myprofile-main">
         <div class="profile-edit-mode-hint" id="profile-edit-hint" role="status" aria-live="polite">
-            <span>Modo edición: toca tu foto o portada para cambiarla</span>
+            <span>Modo edición: toca tu foto, portada, nombre o descripción para editarlos</span>
         </div>
         <article class="banner-info-container">
             <div class="banner-container" id="profile-banner-wrapper">
@@ -63,10 +63,28 @@
             <input type="file" id="banner-file-input" accept="image/*" style="display: none;">
             <div class="profile-info">
                 <div class="follow-container">
-                    <h1 id="profile-username">Perfil</h1>
+                    <div class="profile-editable-field" id="profile-username-wrapper">
+                        <h1 id="profile-username">Perfil</h1>
+                        <span class="profile-inline-edit-pill" aria-hidden="true">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
+                            <span>Editar</span>
+                        </span>
+                    </div>
                 </div>
                 <div class="profile-description">
-                    <p id="profile-bio"></p>
+                    <div class="profile-editable-field profile-editable-bio" id="profile-bio-wrapper">
+                        <p id="profile-bio"></p>
+                        <span class="profile-inline-edit-pill" aria-hidden="true">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
+                            <span>Editar descripción</span>
+                        </span>
+                    </div>
                     <div class="profile-statistics">
                         <div class="statistics-item">
                             <span class="span-title" id="profile-followers-count">0</span>
@@ -138,6 +156,29 @@
     <div id="image-lightbox-backdrop" class="image-lightbox-backdrop" role="dialog" aria-modal="true" aria-label="Vista previa de imagen" aria-hidden="true">
         <button type="button" id="btn-close-lightbox" class="image-lightbox-close" aria-label="Cerrar vista previa">&times;</button>
         <img id="image-lightbox-img" class="image-lightbox-img" src="" alt="Imagen ampliada" referrerpolicy="no-referrer">
+    </div>
+
+    <!-- Modal de Edición de Nombre de Usuario / Descripción en Perfil -->
+    <div class="confirm-backdrop" id="profile-edit-backdrop" aria-hidden="true">
+        <article class="confirm-overlay-container" role="dialog" aria-modal="true" aria-labelledby="profile-edit-title">
+            <div class="confirm-overlay-content">
+                <h2 id="profile-edit-title">Editar campo</h2>
+                <div class="edit-input-wrapper">
+                    <input type="text" id="profile-edit-input" class="edit-modal-input" placeholder="Nuevo nombre de usuario" maxlength="20" autocomplete="off" spellcheck="false" />
+                    <textarea id="profile-edit-textarea" class="edit-modal-input edit-modal-textarea" rows="6" maxlength="200" placeholder="Escribe tu descripción (máx. 200 caracteres)..." style="display: none;"></textarea>
+                    <div id="profile-edit-bio-counter" class="edit-bio-counter" style="display: none;">0 / 200</div>
+                    <p id="profile-edit-error" class="edit-modal-error" role="alert" style="display: none;"></p>
+                </div>
+                <div class="confirm-overlay-selection">
+                    <div id="btn-cancelar-profile-edit" style="cursor: pointer;">
+                        <span>Cancelar</span>
+                    </div>
+                    <div class="confirm-overlay-close" id="btn-guardar-profile-edit" style="cursor: pointer;">
+                        <span>Guardar</span>
+                    </div>
+                </div>
+            </div>
+        </article>
     </div>
 
     <!-- Modal de Comentarios -->
