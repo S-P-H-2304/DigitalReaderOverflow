@@ -28,6 +28,24 @@
     const DEFAULT_BANNER = 'Images/default-banner.svg';
     const DEFAULT_CURRENT_USER_ID = 'user_mclovin';
     const TOTAL_CHAPTER_1_PANELS = 12;
+    const USERNAME_REGEX = /^[a-zA-Z0-9_.]{3,20}$/;
+
+    function validateUsernameFormat(username) {
+        const clean = String(username || '').trim();
+        if (clean.length < 3 || clean.length > 20) {
+            return {
+                valid: false,
+                error: 'El nombre de usuario debe tener entre 3 y 20 caracteres.'
+            };
+        }
+        if (!USERNAME_REGEX.test(clean)) {
+            return {
+                valid: false,
+                error: 'El nombre de usuario solo puede contener letras, números, guion bajo (_) y punto (.), sin espacios ni símbolos especiales.'
+            };
+        }
+        return { valid: true, clean };
+    }
 
     const SEED_CHAPTERS = {
         'chapter_1': {
@@ -730,6 +748,14 @@
             if (!uSnap.exists()) {
                 await fsModRef.setDoc(uRef, SEED_USERS[seedId]);
             }
+            const sUser = SEED_USERS[seedId];
+            if (sUser && sUser.username) {
+                const uKeyRef = fsModRef.doc(fbDb, 'usernames', sUser.username.trim().toLowerCase());
+                const uKeySnap = await fsModRef.getDoc(uKeyRef);
+                if (!uKeySnap.exists()) {
+                    await fsModRef.setDoc(uKeyRef, { uid: seedId, createdAt: Date.now() });
+                }
+            }
         }
 
         const postsCol = fsModRef.collection(fbDb, 'posts');
@@ -795,7 +821,7 @@
                         <form id="form-auth-login" class="auth-form" novalidate>
                             <div class="auth-field-group">
                                 <label for="login-username" class="auth-field-label">Usuario o Correo</label>
-                                <input type="text" id="login-username" name="username" class="auth-input" placeholder="Ej. lector_overflow" autocomplete="username" spellcheck="false" autocorrect="off" autocapitalize="none" enterkeyhint="next" maxlength="60" required />
+                                <input type="text" id="login-username" name="username" class="auth-input" placeholder="Ingresa tu usuario" autocomplete="username" spellcheck="false" autocorrect="off" autocapitalize="none" enterkeyhint="next" maxlength="60" required />
                             </div>
                             <div class="auth-field-group">
                                 <label for="current-password" class="auth-field-label">Contraseña</label>
@@ -810,7 +836,8 @@
                         <form id="form-auth-register" class="auth-form" style="display: none;" novalidate>
                             <div class="auth-field-group">
                                 <label for="reg-username" class="auth-field-label">Nombre de usuario (@username)</label>
-                                <input type="text" id="reg-username" name="username" class="auth-input" placeholder="Máx. 20 caracteres (ej. alex_99)" autocomplete="username" spellcheck="false" autocorrect="off" autocapitalize="none" enterkeyhint="next" maxlength="20" required />
+                                <input type="text" id="reg-username" name="username" class="auth-input" placeholder="Ej. alex_99 o lector.overflow" autocomplete="username" spellcheck="false" autocorrect="off" autocapitalize="none" enterkeyhint="next" maxlength="20" required />
+                                <span class="auth-field-hint">3 a 20 caracteres: solo letras, números, guion bajo (_) y punto (.). Sin espacios ni símbolos especiales.</span>
                             </div>
                             <div class="auth-field-row">
                                 <div class="auth-field-group">
@@ -858,7 +885,8 @@
                     <form id="form-google-username" class="auth-form auth-step-container" style="display: none;" novalidate>
                         <div class="auth-field-group">
                             <label for="google-custom-username" class="auth-field-label">Elige tu nombre de usuario</label>
-                            <input type="text" id="google-custom-username" name="username" class="auth-input" placeholder="Ej. sebas_overflow (3-20 caracteres)" spellcheck="false" autocorrect="off" autocapitalize="none" enterkeyhint="next" maxlength="20" required />
+                            <input type="text" id="google-custom-username" name="username" class="auth-input" placeholder="Ej. sebas_99 o lector.overflow" spellcheck="false" autocorrect="off" autocapitalize="none" enterkeyhint="next" maxlength="20" required />
+                            <span class="auth-field-hint">3 a 20 caracteres: solo letras, números, guion bajo (_) y punto (.). Sin espacios ni símbolos especiales.</span>
                         </div>
                         <div class="auth-field-row">
                             <div class="auth-field-group">
@@ -993,8 +1021,9 @@
                 const email = modal.querySelector('#reg-email').value.trim();
                 const password = modal.querySelector('#new-password').value;
 
-                if (username.length < 3 || username.length > 20) {
-                    showError('El nombre de usuario debe tener entre 3 y 20 caracteres.');
+                const validation = validateUsernameFormat(username);
+                if (!validation.valid) {
+                    showError(validation.error);
                     return;
                 }
                 if (!nombres) {
@@ -1074,8 +1103,9 @@
                 const chosenNombres = modal.querySelector('#google-custom-nombres').value.trim();
                 const chosenApellidos = modal.querySelector('#google-custom-apellidos').value.trim();
 
-                if (chosenUsername.length < 3 || chosenUsername.length > 20) {
-                    showError('El nombre de usuario debe tener entre 3 y 20 caracteres.');
+                const validation = validateUsernameFormat(chosenUsername);
+                if (!validation.valid) {
+                    showError(validation.error);
                     return;
                 }
                 if (!chosenNombres) {
@@ -1120,6 +1150,71 @@
         DEFAULT_BANNER,
         isGoogleAccount,
 
+        validateUsername(username) {
+            return validateUsernameFormat(username);
+        },
+
+        async isUsernameAvailable(username, excludeUid = null) {
+            const validation = validateUsernameFormat(username);
+            if (!validation.valid) {
+                return { available: false, error: validation.error };
+            }
+            const clean = validation.clean;
+            const lowerKey = clean.toLowerCase();
+
+            // 1. Verificación instantánea en caché local
+            const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
+            const localConflict = Object.values(users).find(u =>
+                u && u.username &&
+                u.username.toLowerCase() === lowerKey &&
+                (!excludeUid || u.id !== excludeUid)
+            );
+            if (localConflict) {
+                return {
+                    available: false,
+                    error: `El nombre de usuario "@${clean}" ya está en uso. Por favor elige otro.`
+                };
+            }
+
+            // 2. Verificación en Cloud Firestore
+            await initFirebase();
+            if (fbDb && fsModRef) {
+                try {
+                    // Consulta O(1) directa en usernames/{usernameLower}
+                    const usernameRef = fsModRef.doc(fbDb, 'usernames', lowerKey);
+                    const snap = await fsModRef.getDoc(usernameRef);
+                    if (snap.exists()) {
+                        const data = snap.data();
+                        if (data && data.uid && (!excludeUid || data.uid !== excludeUid)) {
+                            return {
+                                available: false,
+                                error: `El nombre de usuario "@${clean}" ya está en uso. Por favor elige otro.`
+                            };
+                        }
+                    }
+
+                    // Por retrocompatibilidad con usuarios previos a la colección usernames
+                    const usersCol = fsModRef.collection(fbDb, 'users');
+                    const usersSnap = await fsModRef.getDocs(usersCol);
+                    for (const docSnap of usersSnap.docs) {
+                        const uData = docSnap.data();
+                        if (uData && uData.username && uData.username.toLowerCase() === lowerKey) {
+                            if (!excludeUid || docSnap.id !== excludeUid) {
+                                return {
+                                    available: false,
+                                    error: `El nombre de usuario "@${clean}" ya está en uso. Por favor elige otro.`
+                                };
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[isUsernameAvailable Warning]', e);
+                }
+            }
+
+            return { available: true, clean };
+        },
+
         // ==========================================
         // 0. AUTENTICACIÓN DUAL (GOOGLE + USUARIO/CONTRASEÑA)
         // ==========================================
@@ -1140,28 +1235,12 @@
 
         async registerWithCredentials({ username, nombres, apellidos, email, password }) {
             await initFirebase();
-            const cleanUsername = String(username || '').trim();
+            const availCheck = await this.isUsernameAvailable(username);
+            if (!availCheck.available) {
+                throw new Error(availCheck.error);
+            }
+            const cleanUsername = availCheck.clean;
             const cleanEmail = String(email || '').trim().toLowerCase();
-            const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
-
-            // Verificar si el username ya existe en Firestore o en caché local
-            if (fbDb && fsModRef) {
-                try {
-                    const snap = await fsModRef.getDocs(fsModRef.collection(fbDb, 'users'));
-                    snap.forEach(docSnap => {
-                        const u = docSnap.data();
-                        if (u && u.id) users[u.id] = u;
-                    });
-                    setStoredJSON(STORAGE_KEYS.USERS, users);
-                } catch (e) {}
-            }
-
-            const existingUser = Object.values(users).find(u =>
-                u && u.username && u.username.toLowerCase() === cleanUsername.toLowerCase()
-            );
-            if (existingUser) {
-                throw new Error('Ese nombre de usuario ya está en uso. Elige otro.');
-            }
 
             if (fbAuth && authModRef && currentAuthUser) {
                 try { await authModRef.signOut(fbAuth); } catch (e) {}
@@ -1206,6 +1285,11 @@
             if (fbDb && fsModRef) {
                 try {
                     await fsModRef.setDoc(fsModRef.doc(fbDb, 'users', newUserId), newProfile);
+                    // Reservar en la colección de usernames únicos
+                    await fsModRef.setDoc(fsModRef.doc(fbDb, 'usernames', cleanUsername.toLowerCase()), {
+                        uid: newUserId,
+                        createdAt: Date.now()
+                    });
                 } catch (e) {
                     console.warn('[Firestore registerWithCredentials Sync Warning]', e);
                 }
@@ -1606,6 +1690,41 @@
             const targetId = userId || (await this.getCurrentUserId());
             const currentProfile = await this.getProfile(targetId);
             if (!currentProfile) return null;
+
+            if (updates.username) {
+                const validation = validateUsernameFormat(updates.username);
+                if (!validation.valid) {
+                    throw new Error(validation.error);
+                }
+                const newUsername = validation.clean;
+                updates.username = newUsername;
+
+                const oldUsername = currentProfile.username || '';
+                if (newUsername.toLowerCase() !== oldUsername.toLowerCase()) {
+                    const availCheck = await this.isUsernameAvailable(newUsername, targetId);
+                    if (!availCheck.available) {
+                        throw new Error(availCheck.error);
+                    }
+
+                    // En Firestore: reservar el nuevo username y liberar el anterior
+                    await initFirebase();
+                    if (fbDb && fsModRef) {
+                        try {
+                            await fsModRef.setDoc(fsModRef.doc(fbDb, 'usernames', newUsername.toLowerCase()), {
+                                uid: targetId,
+                                createdAt: Date.now()
+                            });
+                            if (oldUsername) {
+                                try {
+                                    await fsModRef.deleteDoc(fsModRef.doc(fbDb, 'usernames', oldUsername.toLowerCase()));
+                                } catch (e) {}
+                            }
+                        } catch (e) {
+                            console.warn('[Firestore username reservation Warning]', e);
+                        }
+                    }
+                }
+            }
 
             const updatedProfile = { ...currentProfile, ...updates };
             cacheUserProfileLocally(updatedProfile);

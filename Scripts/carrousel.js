@@ -42,14 +42,72 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- NOTIFICACIÓN FLOTANTE SUPERIOR Y FEEDBACK SHAKE PARA CAPÍTULOS NO DISPONIBLES ---
+    let lockedToastTimeout = null;
+
+    function showChapterLockedToast(chapterNum) {
+        let toast = document.getElementById('chapter-locked-toast');
+        let toastText = document.getElementById('chapter-locked-toast-text');
+
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'chapter-locked-toast';
+            toast.className = 'chapter-locked-toast';
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+            toast.innerHTML = `
+                <div class="chapter-locked-toast-icon" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.8"/>
+                        <path d="M6.5 6.5L13.5 13.5M6.5 13.5L13.5 6.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <span id="chapter-locked-toast-text" class="chapter-locked-toast-text"></span>
+                <div class="chapter-locked-toast-progress-track" aria-hidden="true">
+                    <div class="chapter-locked-toast-progress-bar"></div>
+                </div>
+            `;
+            document.body.appendChild(toast);
+            toastText = toast.querySelector('#chapter-locked-toast-text');
+        }
+
+        if (toastText) {
+            toastText.textContent = `Capítulo ${chapterNum} próximamente disponible`;
+        }
+
+        // Forzar reflow para reiniciar la animación si se pulsa repetidamente
+        toast.classList.remove('is-visible');
+        void toast.offsetWidth;
+        toast.classList.add('is-visible');
+        toast.setAttribute('aria-hidden', 'false');
+
+        if (lockedToastTimeout) clearTimeout(lockedToastTimeout);
+        lockedToastTimeout = setTimeout(() => {
+            toast.classList.remove('is-visible');
+            toast.setAttribute('aria-hidden', 'true');
+        }, 2800);
+    }
+
+    function triggerRestrictedShake(element) {
+        if (!element) return;
+        element.classList.remove('shake-restricted');
+        void element.offsetWidth;
+        element.classList.add('shake-restricted');
+        setTimeout(() => {
+            element.classList.remove('shake-restricted');
+        }, 500);
+    }
+
+    const existingLockedToast = document.getElementById('chapter-locked-toast');
+    if (existingLockedToast) {
+        existingLockedToast.addEventListener('click', () => {
+            existingLockedToast.classList.remove('is-visible');
+            existingLockedToast.setAttribute('aria-hidden', 'true');
+            if (lockedToastTimeout) clearTimeout(lockedToastTimeout);
+        });
+    }
+
     // --- MANEJO DE ELEMENTOS EXTRA (PLAY Y CLASES) ---
-
-    // Guardamos UNA sola vez el boton original del HTML (con su SVG).
-
-    // En vez de destruirlo y recrearlo, solo lo movemos a la tarjeta activa,
-
-    // asi se conserva el SVG y cualquier listener que tenga.
-
     const playButton = carousel.querySelector('.chapter-card-active button')
         || carousel.querySelector('button');
 
@@ -62,7 +120,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (chapterId === '1') {
                 window.location.href = 'chapterReader.html';
             } else {
-                alert(`Capítulo ${chapterId} próximamente disponible.`);
+                triggerRestrictedShake(playButton);
+                showChapterLockedToast(chapterId);
             }
         });
     }
@@ -299,7 +358,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (chapterId === '1') {
                     window.location.href = 'chapterOneOverview.html';
                 } else {
-                    alert(`Capítulo ${chapterId} próximamente disponible.`);
+                    if (playButton) triggerRestrictedShake(playButton);
+                    showChapterLockedToast(chapterId);
                 }
             }
 

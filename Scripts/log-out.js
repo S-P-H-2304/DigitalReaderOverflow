@@ -81,6 +81,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     let activeRowParagraph = null;
     let activeFieldKey = null;
 
+    function triggerBioLimitAnimation(counterElem) {
+        if (!counterElem) return;
+        counterElem.classList.remove('counter-limit-reached');
+        // Forzar reflow para reiniciar la animación CSS
+        void counterElem.offsetWidth;
+        counterElem.classList.add('counter-limit-reached');
+    }
+
     function showEditError(msg) {
         if (!editError) return;
         editError.textContent = msg;
@@ -114,25 +122,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const fieldName = labelElem.textContent.trim();
                 editTitle.textContent = `Editar ${fieldName}`;
+                const editFieldHint = document.getElementById('edit-field-hint');
 
                 if (field === 'bio' && editTextarea) {
-                    // Descripción: mostrar textarea de al menos 6 líneas con límite de 200 caracteres
+                    if (editFieldHint) editFieldHint.style.display = 'none';
+                    // Descripción: mostrar textarea de al menos 6 líneas con límite de 150 caracteres
                     editInput.style.display = 'none';
                     if (editConfirmPass) editConfirmPass.style.display = 'none';
                     editTextarea.style.display = 'block';
                     editTextarea.rows = 6;
-                    editTextarea.maxLength = 200;
-                    const initialBio = ((user && user.bio) ? user.bio : (valueElem.textContent.trim() === '—' ? '' : valueElem.textContent.trim())).slice(0, 200);
+                    editTextarea.maxLength = 150;
+                    const initialBio = ((user && user.bio) ? user.bio : (valueElem.textContent.trim() === '—' ? '' : valueElem.textContent.trim())).slice(0, 150);
                     editTextarea.value = initialBio;
                     if (editBioCounter) {
                         editBioCounter.style.display = 'block';
-                        editBioCounter.textContent = `${initialBio.length} / 200`;
+                        editBioCounter.classList.remove('counter-limit-reached');
+                        editBioCounter.textContent = `${initialBio.length} / 150`;
+                        if (initialBio.length >= 150) {
+                            triggerBioLimitAnimation(editBioCounter);
+                        }
                     }
                     editBackdrop.classList.add('active');
                     setTimeout(() => {
                         editTextarea.focus();
                     }, 100);
                 } else if (field === 'password') {
+                    if (editFieldHint) editFieldHint.style.display = 'none';
                     // Contraseña (solo cuentas no-Google): mostrar doble input para confirmar
                     if (editTextarea) editTextarea.style.display = 'none';
                     if (editBioCounter) editBioCounter.style.display = 'none';
@@ -155,12 +170,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (editTextarea) editTextarea.style.display = 'none';
                     if (editBioCounter) editBioCounter.style.display = 'none';
                     if (editConfirmPass) editConfirmPass.style.display = 'none';
+                    if (editFieldHint) editFieldHint.style.display = field === 'username' ? 'block' : 'none';
                     editInput.style.display = 'block';
                     editInput.type = field === 'email' ? 'email' : 'text';
                     editInput.maxLength = field === 'username' ? 20 : 120;
                     const currentValue = (user && user[field] !== undefined) ? user[field] : valueElem.textContent.trim();
                     editInput.value = currentValue === '—' ? '' : currentValue;
-                    editInput.placeholder = `Ingresa tu ${fieldName.toLowerCase()}`;
+                    editInput.placeholder = field === 'username' ? 'Ej. alex_99 o lector.overflow' : `Ingresa tu ${fieldName.toLowerCase()}`;
                     editBackdrop.classList.add('active');
                     setTimeout(() => {
                         editInput.focus();
@@ -172,6 +188,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const cerrarModalEdicion = () => {
             editBackdrop.classList.remove('active');
+            const editFieldHint = document.getElementById('edit-field-hint');
+            if (editFieldHint) editFieldHint.style.display = 'none';
             activeRowParagraph = null;
             activeFieldKey = null;
             hideEditError();
@@ -187,8 +205,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (activeFieldKey === 'bio' && editTextarea) {
                 const newBio = editTextarea.value.trim();
-                if (newBio.length > 200) {
-                    showEditError('La descripción no puede superar los 200 caracteres.');
+                if (newBio.length > 150) {
+                    showEditError('La descripción no puede superar los 150 caracteres.');
                     return;
                 }
                 activeRowParagraph.textContent = newBio || '—';
@@ -226,17 +244,29 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
-            if (activeFieldKey === 'username' && (newValue.length < 3 || newValue.length > 20)) {
-                showEditError('El username debe tener entre 3 y 20 caracteres.');
-                return;
+            if (activeFieldKey === 'username') {
+                const validation = window.DB.validateUsername ? window.DB.validateUsername(newValue) : null;
+                if (validation && !validation.valid) {
+                    showEditError(validation.error);
+                    return;
+                }
+                try {
+                    await window.DB.updateProfile({ username: newValue });
+                    activeRowParagraph.textContent = newValue;
+                    if (headerTitle) {
+                        headerTitle.textContent = newValue;
+                    }
+                    cerrarModalEdicion();
+                    return;
+                } catch (err) {
+                    showEditError(err.message || 'Error al actualizar el username.');
+                    return;
+                }
             }
 
             activeRowParagraph.textContent = newValue;
             if (window.DB) {
                 await window.DB.updateProfile({ [activeFieldKey]: newValue });
-                if (activeFieldKey === 'username' && headerTitle) {
-                    headerTitle.textContent = newValue;
-                }
             }
             cerrarModalEdicion();
         };
@@ -274,17 +304,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (editTextarea) {
-            editTextarea.addEventListener('input', () => {
-                if (editTextarea.value.length > 200) {
-                    editTextarea.value = editTextarea.value.slice(0, 200);
-                }
-                if (editBioCounter) {
-                    editBioCounter.textContent = `${editTextarea.value.length} / 200`;
-                }
-            });
             editTextarea.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') {
                     cerrarModalEdicion();
+                    return;
+                }
+                // Si ya está en 150 caracteres y presiona una tecla para escribir, hacer parpadear el contador en rojo
+                const isNavOrControl = e.ctrlKey || e.metaKey || e.altKey || [
+                    'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+                    'Home', 'End', 'Tab', 'Escape'
+                ].includes(e.key);
+                const hasSelection = editTextarea.selectionStart !== editTextarea.selectionEnd;
+                if (!isNavOrControl && !hasSelection && editTextarea.value.length >= 150) {
+                    triggerBioLimitAnimation(editBioCounter);
+                }
+            });
+
+            editTextarea.addEventListener('input', () => {
+                if (editTextarea.value.length >= 150) {
+                    if (editTextarea.value.length > 150) {
+                        editTextarea.value = editTextarea.value.slice(0, 150);
+                    }
+                    triggerBioLimitAnimation(editBioCounter);
+                } else if (editBioCounter) {
+                    editBioCounter.classList.remove('counter-limit-reached');
+                }
+                if (editBioCounter) {
+                    editBioCounter.textContent = `${editTextarea.value.length} / 150`;
                 }
             });
         }

@@ -57,6 +57,12 @@ rules_version = '2';
 //   - viewsCount: number (optional, >= 0) - Global chapter view counter
 //   - totalPanels: number (optional, >= 0) - Total panels in the chapter
 //
+// Collection: usernames
+// Document ID: {usernameLower} (e.g., 'alex_99', 'lector_overflow')
+// Fields:
+//   - uid: string (required, 1..128 chars) - Associated User ID
+//   - createdAt: number (optional, >= 0) - Timestamp in milliseconds
+//
 // ===============================================================
 
 service cloud.firestore {
@@ -326,6 +332,22 @@ service cloud.firestore {
                        idNotModified();
 
       allow delete: if false;
+    }
+
+    match /usernames/{usernameLower} {
+      // Public read access to check availability in real time
+      allow read: if true;
+
+      // Create new username reservation
+      allow create: if request.resource.data.keys().hasOnly(['uid', 'createdAt']) &&
+                       request.resource.data.uid is string &&
+                       request.resource.data.uid.size() >= 1 &&
+                       request.resource.data.uid.size() <= 128 &&
+                       (request.auth != null || request.resource.data.uid.matches('^user_.*'));
+
+      // Owner can update or release/delete their reserved username
+      allow update, delete: if (isAuthenticated() && resource.data.uid == request.auth.uid) ||
+                               resource.data.uid.matches('^user_.*');
     }
 
     // Default deny for all other collections and paths

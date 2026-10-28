@@ -112,8 +112,9 @@
                     <h2 id="edit-field-title">Editar campo</h2>
                     <div class="edit-input-wrapper">
                         <input type="text" id="edit-field-input" class="edit-modal-input" placeholder="Ingresa un nuevo valor" autocomplete="off" />
-                        <textarea id="edit-field-textarea" class="edit-modal-input edit-modal-textarea" rows="6" maxlength="200" placeholder="Escribe tu descripción (máx. 200 caracteres)..." style="display: none;"></textarea>
-                        <div id="edit-bio-counter" class="edit-bio-counter" style="display: none;">0 / 200</div>
+                        <p id="edit-field-hint" class="edit-modal-hint" style="display: none;">De 3 a 20 caracteres: solo letras, números, guion bajo (_) y punto (.). Sin espacios ni símbolos especiales.</p>
+                        <textarea id="edit-field-textarea" class="edit-modal-input edit-modal-textarea" rows="6" maxlength="150" placeholder="Escribe tu descripción (máx. 150 caracteres)..." style="display: none;"></textarea>
+                        <div id="edit-bio-counter" class="edit-bio-counter" style="display: none;">0 / 150</div>
                         <input type="password" id="edit-field-confirm-password" class="edit-modal-input" placeholder="Confirmar nueva contraseña" autocomplete="new-password" enterkeyhint="done" style="display: none; margin-top: 0.75rem;" />
                         <p id="edit-field-error" class="edit-modal-error" role="alert" style="display: none;"></p>
                     </div>

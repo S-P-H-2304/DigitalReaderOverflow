@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (profileBanner) profileBanner.src = user.banner || window.DB.DEFAULT_BANNER;
         if (profileUsername) profileUsername.textContent = user.username || 'Perfil';
         if (profileBio) {
-            const cleanBio = (user.bio || '').slice(0, 200);
+            const cleanBio = (user.bio || '').slice(0, 150);
             profileBio.textContent = cleanBio;
             profileBio.classList.toggle('is-empty-bio', !cleanBio);
         }
@@ -170,6 +170,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --- 3.5 EDITAR USERNAME Y DESCRIPCIÓN DESDE EL PERFIL (EN MODO EDICIÓN) ---
+    function triggerBioLimitAnimation(counterElem) {
+        if (!counterElem) return;
+        counterElem.classList.remove('counter-limit-reached');
+        // Forzar reflow para reiniciar la animación CSS
+        void counterElem.offsetWidth;
+        counterElem.classList.add('counter-limit-reached');
+    }
+
     function showProfileEditError(msg) {
         if (!profileEditError) return;
         profileEditError.textContent = msg;
@@ -188,15 +196,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         hideProfileEditError();
         const user = await window.DB.getProfile();
 
+        const profileEditHintText = document.getElementById('profile-edit-hint-text');
+
         if (field === 'username') {
             if (profileEditTitle) profileEditTitle.textContent = 'Editar Username';
             if (profileEditTextarea) profileEditTextarea.style.display = 'none';
             if (profileEditBioCounter) profileEditBioCounter.style.display = 'none';
+            if (profileEditHintText) profileEditHintText.style.display = 'block';
             if (profileEditInput) {
                 profileEditInput.style.display = 'block';
                 profileEditInput.maxLength = 20;
                 profileEditInput.value = (user && user.username) ? user.username : (profileUsername ? profileUsername.textContent.trim() : '');
-                profileEditInput.placeholder = 'Ingresa tu nombre de usuario (3-20 caracteres)';
+                profileEditInput.placeholder = 'Ej. alex_99 o lector.overflow';
             }
             profileEditBackdrop.classList.add('active');
             profileEditBackdrop.setAttribute('aria-hidden', 'false');
@@ -207,17 +218,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }, 90);
         } else if (field === 'bio') {
+            if (profileEditHintText) profileEditHintText.style.display = 'none';
             if (profileEditTitle) profileEditTitle.textContent = 'Editar Descripción';
             if (profileEditInput) profileEditInput.style.display = 'none';
             if (profileEditTextarea) {
                 profileEditTextarea.style.display = 'block';
                 profileEditTextarea.rows = 6;
-                profileEditTextarea.maxLength = 200;
-                const currentBio = ((user && user.bio) ? user.bio : (profileBio ? profileBio.textContent.trim() : '')).slice(0, 200);
+                profileEditTextarea.maxLength = 150;
+                const currentBio = ((user && user.bio) ? user.bio : (profileBio ? profileBio.textContent.trim() : '')).slice(0, 150);
                 profileEditTextarea.value = currentBio;
                 if (profileEditBioCounter) {
                     profileEditBioCounter.style.display = 'block';
-                    profileEditBioCounter.textContent = `${currentBio.length} / 200`;
+                    profileEditBioCounter.classList.remove('counter-limit-reached');
+                    profileEditBioCounter.textContent = `${currentBio.length} / 150`;
+                    if (currentBio.length >= 150) {
+                        triggerBioLimitAnimation(profileEditBioCounter);
+                    }
                 }
             }
             profileEditBackdrop.classList.add('active');
@@ -232,6 +248,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!profileEditBackdrop) return;
         profileEditBackdrop.classList.remove('active');
         profileEditBackdrop.setAttribute('aria-hidden', 'true');
+        const hintText = document.getElementById('profile-edit-hint-text');
+        if (hintText) hintText.style.display = 'none';
         activeProfileEditField = null;
         hideProfileEditError();
     }
@@ -245,21 +263,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (activeProfileEditField === 'username' && profileEditInput) {
             const newUsername = profileEditInput.value.trim();
-            if (newUsername.length < 3 || newUsername.length > 20) {
-                showProfileEditError('El nombre de usuario debe tener entre 3 y 20 caracteres.');
+            const validation = window.DB.validateUsername ? window.DB.validateUsername(newUsername) : null;
+            if (validation && !validation.valid) {
+                showProfileEditError(validation.error);
                 return;
             }
-            await window.DB.updateProfile({ username: newUsername });
-            if (profileUsername) profileUsername.textContent = newUsername;
-            closeProfileTextEditModal();
-            await renderProfileFeed();
-            return;
+            try {
+                await window.DB.updateProfile({ username: newUsername });
+                if (profileUsername) profileUsername.textContent = newUsername;
+                closeProfileTextEditModal();
+                await renderProfileFeed();
+                return;
+            } catch (err) {
+                showProfileEditError(err.message || 'Error al guardar el nombre de usuario.');
+                return;
+            }
         }
 
         if (activeProfileEditField === 'bio' && profileEditTextarea) {
             const newBio = profileEditTextarea.value.trim();
-            if (newBio.length > 200) {
-                showProfileEditError('La descripción no puede superar los 200 caracteres.');
+            if (newBio.length > 150) {
+                showProfileEditError('La descripción no puede superar los 150 caracteres.');
                 return;
             }
             await window.DB.updateProfile({ bio: newBio });
@@ -308,17 +332,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (profileEditTextarea) {
-        profileEditTextarea.addEventListener('input', () => {
-            if (profileEditTextarea.value.length > 200) {
-                profileEditTextarea.value = profileEditTextarea.value.slice(0, 200);
-            }
-            if (profileEditBioCounter) {
-                profileEditBioCounter.textContent = `${profileEditTextarea.value.length} / 200`;
-            }
-        });
         profileEditTextarea.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closeProfileTextEditModal();
+                return;
+            }
+            // Si ya está en 150 caracteres y presiona una tecla para escribir, hacer parpadear el contador en rojo
+            const isNavOrControl = e.ctrlKey || e.metaKey || e.altKey || [
+                'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+                'Home', 'End', 'Tab', 'Escape'
+            ].includes(e.key);
+            const hasSelection = profileEditTextarea.selectionStart !== profileEditTextarea.selectionEnd;
+            if (!isNavOrControl && !hasSelection && profileEditTextarea.value.length >= 150) {
+                triggerBioLimitAnimation(profileEditBioCounter);
+            }
+        });
+
+        profileEditTextarea.addEventListener('input', () => {
+            if (profileEditTextarea.value.length >= 150) {
+                if (profileEditTextarea.value.length > 150) {
+                    profileEditTextarea.value = profileEditTextarea.value.slice(0, 150);
+                }
+                triggerBioLimitAnimation(profileEditBioCounter);
+            } else if (profileEditBioCounter) {
+                profileEditBioCounter.classList.remove('counter-limit-reached');
+            }
+            if (profileEditBioCounter) {
+                profileEditBioCounter.textContent = `${profileEditTextarea.value.length} / 150`;
             }
         });
     }
