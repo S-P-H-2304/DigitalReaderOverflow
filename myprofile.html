@@ -203,6 +203,29 @@
         </div>
     </div>
 
+    <!-- Modal de Recorte y Encuadre Táctil para Avatar y Banner -->
+    <div class="confirm-backdrop" id="image-cropper-backdrop" aria-hidden="true">
+        <article class="cropper-modal-container" role="dialog" aria-modal="true" aria-labelledby="cropper-modal-title">
+            <div class="cropper-modal-header">
+                <h2 id="cropper-modal-title">Encuadrar imagen</h2>
+                <p class="cropper-modal-hint">Arrastra con un dedo y pellizca con dos para hacer zoom</p>
+            </div>
+            <div class="cropper-stage" id="cropper-stage">
+                <div id="cropper-viewport" class="cropper-viewport">
+                    <img id="cropper-image" src="" alt="Vista previa para recorte" draggable="false">
+                </div>
+            </div>
+            <div class="cropper-actions">
+                <button type="button" class="cropper-btn cropper-btn-cancel" id="btn-cropper-cancel">
+                    <span>Cancelar</span>
+                </button>
+                <button type="button" class="cropper-btn cropper-btn-apply" id="btn-cropper-apply">
+                    <span>Aplicar</span>
+                </button>
+            </div>
+        </article>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
     <script src="Scripts/motion.js"></script>
     <script src="Scripts/db.js"></script>

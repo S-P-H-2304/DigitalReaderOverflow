@@ -1384,6 +1384,7 @@ a {
 }
 
 .page-container {
+    position: relative;
     width: 100%;
     height: auto;
     display: flex;
@@ -1396,6 +1397,79 @@ a {
     height: auto;
     display: block;
     object-fit: contain;
+}
+
+/* =========================================
+   HOTSPOTS DE SONIDO INTERACTIVOS EN PANELES
+========================================= */
+.audio-hotspot {
+    position: absolute;
+    width: 2.8rem;
+    height: 2.8rem;
+    border-radius: 50%;
+    background: var(--card-bg);
+    border-top: var(--glass-border-top);
+    border-left: var(--glass-border-left);
+    border-bottom: var(--glass-border-bottom);
+    border-right: var(--glass-border-right);
+    box-shadow: var(--glass-glow), 0 4px 14px rgba(0, 0, 0, 0.35);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--on-surface);
+    z-index: 10;
+    transform: translate(-50%, -50%);
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s ease, color 0.2s ease;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+}
+
+.audio-hotspot:active {
+    transform: translate(-50%, -50%) scale(0.92);
+}
+
+.audio-hotspot-icon {
+    width: 1.35rem;
+    height: 1.35rem;
+    stroke: currentColor;
+    pointer-events: none;
+}
+
+/* Pulso sutil para llamar la atención sin estorbar el dibujo */
+.audio-hotspot-ping {
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 2px solid var(--accent-color);
+    opacity: 0.6;
+    animation: hotspotPing 2.8s infinite cubic-bezier(0, 0, 0.2, 1);
+    pointer-events: none;
+}
+
+@keyframes hotspotPing {
+    0% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.35); opacity: 0; }
+    100% { transform: scale(1); opacity: 0; }
+}
+
+/* Estado activo mientras suena el efecto */
+.audio-hotspot.is-playing {
+    background: var(--button-bg);
+    color: #FFFFFF;
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.audio-hotspot.is-playing .audio-hotspot-icon {
+    animation: hotspotWave 0.7s infinite alternate ease-in-out;
+}
+
+@keyframes hotspotWave {
+    from { transform: scale(1); }
+    to { transform: scale(1.18); }
 }
 
 .body-reader {
@@ -1478,9 +1552,161 @@ a {
     visibility: visible;
 }
 
-.confirm-backdrop.active .confirm-overlay-container {
+.confirm-backdrop.active .confirm-overlay-container,
+.confirm-backdrop.active .cropper-modal-container {
     transform: scale(1) translateZ(0);
 }
+
+/* =========================================
+   MODAL DE RECORTE Y ENCUADRE TÁCTIL
+========================================= */
+.cropper-modal-container {
+    background-color: var(--card-bg);
+    border-top: var(--glass-border-top);
+    border-left: var(--glass-border-left);
+    border-bottom: var(--glass-border-bottom);
+    border-right: var(--glass-border-right);
+    box-shadow: var(--glass-glow), 0 8px 30px rgba(0, 0, 0, 0.45);
+    height: auto;
+    width: calc(100% - 2.5rem);
+    max-width: 380px;
+    padding: 1.5rem 1.4rem;
+    border-radius: 2rem;
+    transform: scale(0.8);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    -webkit-backdrop-filter: blur(25px);
+    backdrop-filter: blur(25px);
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+    align-items: center;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.cropper-modal-header {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    width: 100%;
+}
+
+.cropper-modal-header h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.cropper-modal-hint {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    opacity: 0.9;
+    margin: 0;
+}
+
+.cropper-stage {
+    position: relative;
+    width: 100%;
+    height: 260px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    border-radius: 1.2rem;
+    background: rgba(8, 12, 16, 0.7);
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: grab;
+}
+
+.cropper-stage:active {
+    cursor: grabbing;
+}
+
+.cropper-viewport {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.62);
+    border: 2.5px solid rgba(255, 255, 255, 0.9);
+    z-index: 2;
+    pointer-events: none;
+}
+
+.cropper-viewport.mode-avatar {
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+}
+
+.cropper-viewport.mode-banner {
+    width: 280px;
+    height: 160px;
+    border-radius: 1.4rem;
+}
+
+#cropper-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+    will-change: transform;
+    pointer-events: none;
+    max-width: none;
+    max-height: none;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.cropper-actions {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    gap: 0.9rem;
+}
+
+.cropper-btn {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border-radius: 1.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: transform 0.15s ease, opacity 0.15s ease;
+    border: none;
+    background: transparent;
+}
+
+.cropper-btn:active {
+    transform: scale(0.96);
+}
+
+.cropper-btn-cancel {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-top: var(--glass-border-top);
+    border-left: var(--glass-border-left);
+    border-bottom: var(--glass-border-bottom);
+    border-right: var(--glass-border-right);
+}
+
+.cropper-btn-apply {
+    background-color: var(--button-bg);
+    border-top: var(--glass-border-top);
+    border-left: var(--glass-border-left);
+    border-bottom: var(--glass-border-bottom);
+    border-right: var(--glass-border-right);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
 
 .post-textarea {
     flex: 1;

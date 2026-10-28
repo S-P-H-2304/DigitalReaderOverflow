@@ -85,25 +85,254 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Seguimiento de paneles leídos para actualizar progreso en Firestore
-    if (visor && window.DB) {
+    // =========================================================================
+    // 2. SISTEMA DE AUDIO AMBIENTAL Y EFECTOS INTERACTIVOS (READER AUDIO MANAGER)
+    // =========================================================================
+    const CHAPTER_AUDIO_CONFIG = {
+        ambientTracks: [
+            { id: 'calm', src: 'Audio/ambient-calm.wav', pages: [1, 4] },
+            { id: 'tension', src: 'Audio/ambient-tension.wav', pages: [5, 8] },
+            { id: 'climax', src: 'Audio/ambient-climax.wav', pages: [9, 12] }
+        ],
+        crossfadeDuration: 1.2, // segundos de transición entre pistas
+        duckingFactor: 0.25      // factor de atenuación de fondo mientras suena un efecto
+    };
+
+    const ReaderAudioManager = (() => {
+        let ambientA = new Audio();
+        let ambientB = new Audio();
+        ambientA.loop = true;
+        ambientB.loop = true;
+        ambientA.preload = 'auto';
+        ambientB.preload = 'auto';
+
+        let activeAmbient = ambientA;
+        let standbyAmbient = ambientB;
+        let currentTrackId = null;
+        let isDucking = false;
+        let masterVolumeRatio = 0.8;
+        let isAudioUnlocked = false;
+        let currentVisiblePage = 1;
+
+        function getTargetAmbientVolume() {
+            if (masterVolumeRatio <= 0) return 0;
+            return isDucking 
+                ? masterVolumeRatio * CHAPTER_AUDIO_CONFIG.duckingFactor 
+                : masterVolumeRatio;
+        }
+
+        function fadeAudio(audio, targetVol, durationSec, onComplete) {
+            if (!audio) return;
+            const startVol = audio.volume;
+            const target = Math.max(0, Math.min(1, targetVol));
+            const startTime = performance.now();
+            const durationMs = Math.max(50, durationSec * 1000);
+
+            function step(now) {
+                const elapsed = now - startTime;
+                const progress = Math.min(1, elapsed / durationMs);
+                audio.volume = Math.max(0, Math.min(1, startVol + (target - startVol) * progress));
+                if (progress < 1) {
+                    requestAnimationFrame(step);
+                } else if (onComplete) {
+                    onComplete();
+                }
+            }
+            requestAnimationFrame(step);
+        }
+
+        function playAmbientForPage(pageNum) {
+            const track = CHAPTER_AUDIO_CONFIG.ambientTracks.find(
+                t => pageNum >= t.pages[0] && pageNum <= t.pages[1]
+            );
+            if (!track || track.id === currentTrackId) return;
+
+            currentTrackId = track.id;
+            if (!isAudioUnlocked) return; // Se iniciará cuando el usuario interactúe
+
+            // Crossfade suave hacia la nueva pista
+            standbyAmbient.src = track.src;
+            standbyAmbient.currentTime = 0;
+            standbyAmbient.volume = 0;
+
+            const playPromise = standbyAmbient.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    const targetVol = getTargetAmbientVolume();
+                    fadeAudio(standbyAmbient, targetVol, CHAPTER_AUDIO_CONFIG.crossfadeDuration);
+                    fadeAudio(activeAmbient, 0, CHAPTER_AUDIO_CONFIG.crossfadeDuration, () => {
+                        activeAmbient.pause();
+                        activeAmbient.currentTime = 0;
+                        // Intercambiar activo y standby
+                        const temp = activeAmbient;
+                        activeAmbient = standbyAmbient;
+                        standbyAmbient = temp;
+                    });
+                }).catch(err => {
+                    console.warn('[ReaderAudio] Autoplay en espera de interacción:', err);
+                });
+            }
+        }
+
+        function unlockAndStartAudio() {
+            if (isAudioUnlocked) return;
+            isAudioUnlocked = true;
+
+            window.removeEventListener('touchstart', unlockAndStartAudio);
+            window.removeEventListener('click', unlockAndStartAudio);
+            if (visor) visor.removeEventListener('scroll', unlockAndStartAudio);
+
+            // Iniciar pista ambiental de la página actual
+            const track = CHAPTER_AUDIO_CONFIG.ambientTracks.find(
+                t => currentVisiblePage >= t.pages[0] && currentVisiblePage <= t.pages[1]
+            );
+            if (track) {
+                currentTrackId = track.id;
+                activeAmbient.src = track.src;
+                activeAmbient.currentTime = 0;
+                activeAmbient.volume = 0;
+                const p = activeAmbient.play();
+                if (p !== undefined) {
+                    p.then(() => {
+                        fadeAudio(activeAmbient, getTargetAmbientVolume(), 1.0);
+                    }).catch(() => {});
+                }
+            }
+        }
+
+        function setMasterVolume(ratio) {
+            masterVolumeRatio = Math.max(0, Math.min(1, Number(ratio) || 0));
+            if (activeAmbient) {
+                activeAmbient.volume = getTargetAmbientVolume();
+            }
+        }
+
+        function applyDucking(enable) {
+            isDucking = Boolean(enable);
+            if (activeAmbient) {
+                fadeAudio(activeAmbient, getTargetAmbientVolume(), 0.35);
+            }
+        }
+
+        function playHotspotSound(btn, soundSrc) {
+            if (!soundSrc) return;
+            unlockAndStartAudio();
+
+            const sfx = new Audio(soundSrc);
+            sfx.volume = masterVolumeRatio;
+
+            btn.classList.add('is-playing');
+            applyDucking(true);
+
+            let hasCleanedUp = false;
+            const cleanup = () => {
+                if (hasCleanedUp) return;
+                hasCleanedUp = true;
+                btn.classList.remove('is-playing');
+                applyDucking(false);
+            };
+
+            sfx.addEventListener('ended', cleanup, { once: true });
+            sfx.addEventListener('error', cleanup, { once: true });
+            setTimeout(cleanup, 4500); // Timeout de seguridad
+
+            const p = sfx.play();
+            if (p !== undefined) {
+                p.catch(cleanup);
+            }
+        }
+
+        function onPageChanged(pageNum) {
+            if (pageNum !== currentVisiblePage) {
+                currentVisiblePage = pageNum;
+                playAmbientForPage(pageNum);
+            }
+        }
+
+        function pauseAll() {
+            if (activeAmbient) activeAmbient.pause();
+        }
+
+        function resumeAmbient() {
+            if (isAudioUnlocked && activeAmbient && currentTrackId && activeAmbient.paused) {
+                activeAmbient.play().catch(() => {});
+            }
+        }
+
+        // Desbloqueo silencioso al primer toque o scroll
+        window.addEventListener('touchstart', unlockAndStartAudio, { passive: true });
+        window.addEventListener('click', unlockAndStartAudio, { passive: true });
+        if (visor) visor.addEventListener('scroll', unlockAndStartAudio, { passive: true });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                pauseAll();
+            } else {
+                resumeAmbient();
+            }
+        });
+
+        return {
+            setMasterVolume,
+            playHotspotSound,
+            onPageChanged,
+            pauseAll,
+            resumeAmbient
+        };
+    })();
+
+    // Conectar hotspots interactivos existentes
+    const audioHotspots = Array.from(document.querySelectorAll('.audio-hotspot'));
+    audioHotspots.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const soundSrc = btn.getAttribute('data-sound');
+            ReaderAudioManager.playHotspotSound(btn, soundSrc);
+            if (window.Motion && window.Motion.popReaderControl) {
+                window.Motion.popReaderControl(btn);
+            }
+        });
+    });
+
+    // Seguimiento de paneles leídos y actualización dinámica de audio por página
+    if (visor) {
         const panels = Array.from(visor.querySelectorAll('.page-container'));
         const totalPanels = panels.length || 12;
 
         const updateReadingProgress = () => {
             if (!panels.length) return;
             const viewportBottom = visor.scrollTop + visor.clientHeight;
+            const visorRect = visor.getBoundingClientRect();
             let readCount = 1;
+            let mostVisiblePage = 1;
+            let maxVisibleHeight = 0;
+
             panels.forEach((panel, idx) => {
                 const panelMid = panel.offsetTop + (panel.offsetHeight * 0.35);
                 if (viewportBottom >= panelMid) {
                     readCount = idx + 1;
                 }
+
+                // Determinar qué panel ocupa la mayor proporción de la pantalla para el audio
+                const rect = panel.getBoundingClientRect();
+                const visibleTop = Math.max(visorRect.top, rect.top);
+                const visibleBottom = Math.min(visorRect.bottom, rect.bottom);
+                const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+                if (visibleHeight > maxVisibleHeight) {
+                    maxVisibleHeight = visibleHeight;
+                    const pNum = parseInt(panel.getAttribute('data-page'), 10);
+                    if (!isNaN(pNum)) mostVisiblePage = pNum;
+                }
             });
+
             if (visor.scrollTop + visor.clientHeight >= visor.scrollHeight - 40) {
                 readCount = totalPanels;
             }
-            window.DB.saveChapterProgress('chapter_1', readCount, totalPanels);
+
+            if (window.DB) {
+                window.DB.saveChapterProgress('chapter_1', readCount, totalPanels);
+            }
+            ReaderAudioManager.onPageChanged(mostVisiblePage);
         };
 
         // Registrar primer panel al abrir
@@ -173,6 +402,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (waveMid) waveMid.style.opacity = clamped >= 25 ? '1' : '0.22';
             btnVolume.classList.toggle('is-muted-volume', clamped === 0);
         }
+
+        // Sincronizar con el motor de audio en tiempo real
+        ReaderAudioManager.setMasterVolume(clamped / 100);
     }
 
     if (window.DB) {

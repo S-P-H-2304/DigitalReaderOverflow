@@ -49,6 +49,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnGuardarProfileEdit = document.getElementById('btn-guardar-profile-edit');
     let activeProfileEditField = null; // 'username' | 'bio'
 
+    // Modal de recorte y encuadre táctil
+    const cropperBackdrop = document.getElementById('image-cropper-backdrop');
+    const cropperStage = document.getElementById('cropper-stage');
+    const cropperViewport = document.getElementById('cropper-viewport');
+    const cropperImage = document.getElementById('cropper-image');
+    const cropperTitle = document.getElementById('cropper-modal-title');
+    const btnCropperCancel = document.getElementById('btn-cropper-cancel');
+    const btnCropperApply = document.getElementById('btn-cropper-apply');
+
     // Lightbox de inspección
     const lightboxBackdrop = document.getElementById('image-lightbox-backdrop');
     const lightboxImg = document.getElementById('image-lightbox-img');
@@ -322,7 +331,323 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // --- 4. CAMBIAR AVATAR Y BANNER (SOLO EN MODO EDICIÓN) O INSPECCIONAR (MODO NORMAL) ---
+    // --- 4. CAMBIAR AVATAR Y BANNER CON RECORTE Y ENCUADRE TÁCTIL (MODO EDICIÓN) O INSPECCIONAR (MODO NORMAL) ---
+    let cropperTarget = null; // 'avatar' | 'banner'
+    let cropperImgNaturalWidth = 0;
+    let cropperImgNaturalHeight = 0;
+    let cropperScale = 1;
+    let cropperMinScale = 1;
+    let cropperMaxScale = 4;
+    let cropperPosX = 0;
+    let cropperPosY = 0;
+    let cropperViewportWidth = 200;
+    let cropperViewportHeight = 200;
+    let cropperOriginalImgObj = null;
+
+    function clampCropperPosition() {
+        const renderedW = cropperImgNaturalWidth * cropperScale;
+        const renderedH = cropperImgNaturalHeight * cropperScale;
+        const minX = cropperViewportWidth - renderedW;
+        const maxX = 0;
+        const minY = cropperViewportHeight - renderedH;
+        const maxY = 0;
+
+        cropperPosX = Math.min(maxX, Math.max(minX, cropperPosX));
+        cropperPosY = Math.min(maxY, Math.max(minY, cropperPosY));
+    }
+
+    function updateCropperTransform() {
+        clampCropperPosition();
+        if (cropperImage) {
+            cropperImage.style.transform = `translate3d(${cropperPosX}px, ${cropperPosY}px, 0) scale(${cropperScale})`;
+        }
+    }
+
+    function openImageCropper(file, target) {
+        if (!file || !file.type.startsWith('image/')) {
+            alert('Por favor selecciona un archivo de imagen válido.');
+            return;
+        }
+        if (!cropperBackdrop || !cropperViewport || !cropperImage) return;
+
+        cropperTarget = target;
+        if (cropperTitle) {
+            cropperTitle.textContent = target === 'avatar' ? 'Encuadrar foto de perfil' : 'Encuadrar portada';
+        }
+
+        // Configurar clase del viewport (forma de la máscara)
+        cropperViewport.classList.remove('mode-avatar', 'mode-banner');
+        cropperViewport.classList.add(target === 'avatar' ? 'mode-avatar' : 'mode-banner');
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                cropperOriginalImgObj = img;
+                cropperImgNaturalWidth = img.naturalWidth || img.width;
+                cropperImgNaturalHeight = img.naturalHeight || img.height;
+
+                cropperImage.src = e.target.result;
+                cropperImage.style.width = `${cropperImgNaturalWidth}px`;
+                cropperImage.style.height = `${cropperImgNaturalHeight}px`;
+
+                cropperBackdrop.classList.add('active');
+                cropperBackdrop.setAttribute('aria-hidden', 'false');
+
+                // Medir dimensiones reales del viewport una vez visible
+                requestAnimationFrame(() => {
+                    const rect = cropperViewport.getBoundingClientRect();
+                    cropperViewportWidth = rect.width || (target === 'avatar' ? 200 : 280);
+                    cropperViewportHeight = rect.height || (target === 'avatar' ? 200 : 160);
+
+                    // Escala mínima requerida para que cubra todo el viewport sin huecos
+                    cropperMinScale = Math.max(
+                        cropperViewportWidth / cropperImgNaturalWidth,
+                        cropperViewportHeight / cropperImgNaturalHeight
+                    );
+                    cropperMaxScale = Math.max(cropperMinScale * 4, cropperMinScale + 2);
+                    cropperScale = cropperMinScale;
+
+                    // Centrar inicialmente
+                    const renderedW = cropperImgNaturalWidth * cropperScale;
+                    const renderedH = cropperImgNaturalHeight * cropperScale;
+                    cropperPosX = (cropperViewportWidth - renderedW) / 2;
+                    cropperPosY = (cropperViewportHeight - renderedH) / 2;
+
+                    updateCropperTransform();
+                });
+            };
+            img.onerror = () => {
+                alert('No se pudo cargar la imagen para encuadrar.');
+            };
+            img.src = e.target.result;
+        };
+        reader.onerror = () => {
+            alert('Error al leer el archivo de la galería.');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function closeImageCropper() {
+        if (!cropperBackdrop) return;
+        cropperBackdrop.classList.remove('active');
+        cropperBackdrop.setAttribute('aria-hidden', 'true');
+        if (cropperImage) {
+            cropperImage.src = '';
+            cropperImage.style.transform = '';
+        }
+        cropperOriginalImgObj = null;
+        cropperTarget = null;
+        if (avatarFileInput) avatarFileInput.value = '';
+        if (bannerFileInput) bannerFileInput.value = '';
+    }
+
+    // GESTOS TÁCTILES MÓVILES (Arrastre 1 dedo + Pellizco 2 dedos)
+    if (cropperStage) {
+        let isTouchDragging = false;
+        let isTouchPinching = false;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchStartPosX = 0;
+        let touchStartPosY = 0;
+        let touchStartDist = 0;
+        let touchStartScale = 1;
+        let touchPinchMidpoint = { x: 0, y: 0 };
+
+        function getTouchDistance(t1, t2) {
+            return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        }
+
+        function getTouchMidpoint(t1, t2, vpRect) {
+            return {
+                x: (t1.clientX + t2.clientX) / 2 - vpRect.left,
+                y: (t1.clientY + t2.clientY) / 2 - vpRect.top
+            };
+        }
+
+        cropperStage.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                isTouchDragging = true;
+                isTouchPinching = false;
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                touchStartPosX = cropperPosX;
+                touchStartPosY = cropperPosY;
+            } else if (e.touches.length === 2) {
+                isTouchDragging = false;
+                isTouchPinching = true;
+                touchStartDist = getTouchDistance(e.touches[0], e.touches[1]);
+                touchStartScale = cropperScale;
+                const vpRect = cropperViewport.getBoundingClientRect();
+                touchPinchMidpoint = getTouchMidpoint(e.touches[0], e.touches[1], vpRect);
+                touchStartPosX = cropperPosX;
+                touchStartPosY = cropperPosY;
+            }
+        }, { passive: true });
+
+        cropperStage.addEventListener('touchmove', (e) => {
+            if (isTouchDragging && e.touches.length === 1) {
+                if (e.cancelable) e.preventDefault();
+                const dx = e.touches[0].clientX - touchStartX;
+                const dy = e.touches[0].clientY - touchStartY;
+                cropperPosX = touchStartPosX + dx;
+                cropperPosY = touchStartPosY + dy;
+                updateCropperTransform();
+            } else if (isTouchPinching && e.touches.length === 2) {
+                if (e.cancelable) e.preventDefault();
+                const currentDist = getTouchDistance(e.touches[0], e.touches[1]);
+                if (touchStartDist > 0) {
+                    const factor = currentDist / touchStartDist;
+                    let newScale = touchStartScale * factor;
+                    newScale = Math.min(cropperMaxScale, Math.max(cropperMinScale, newScale));
+
+                    const origImgX = (touchPinchMidpoint.x - touchStartPosX) / touchStartScale;
+                    const origImgY = (touchPinchMidpoint.y - touchStartPosY) / touchStartScale;
+                    cropperPosX = touchPinchMidpoint.x - origImgX * newScale;
+                    cropperPosY = touchPinchMidpoint.y - origImgY * newScale;
+                    cropperScale = newScale;
+                    updateCropperTransform();
+                }
+            }
+        }, { passive: false });
+
+        const endTouch = (e) => {
+            if (e.touches.length === 1) {
+                isTouchPinching = false;
+                isTouchDragging = true;
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                touchStartPosX = cropperPosX;
+                touchStartPosY = cropperPosY;
+            } else if (e.touches.length === 0) {
+                isTouchDragging = false;
+                isTouchPinching = false;
+            }
+        };
+
+        cropperStage.addEventListener('touchend', endTouch, { passive: true });
+        cropperStage.addEventListener('touchcancel', endTouch, { passive: true });
+
+        // Soporte adicional con mouse (para pruebas y escritorio)
+        let isMouseDown = false;
+        let mouseStartX = 0, mouseStartY = 0;
+        let mouseStartPosX = 0, mouseStartPosY = 0;
+
+        cropperStage.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            isMouseDown = true;
+            mouseStartX = e.clientX;
+            mouseStartY = e.clientY;
+            mouseStartPosX = cropperPosX;
+            mouseStartPosY = cropperPosY;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isMouseDown) return;
+            const dx = e.clientX - mouseStartX;
+            const dy = e.clientY - mouseStartY;
+            cropperPosX = mouseStartPosX + dx;
+            cropperPosY = mouseStartPosY + dy;
+            updateCropperTransform();
+        });
+
+        window.addEventListener('mouseup', () => {
+            isMouseDown = false;
+        });
+
+        cropperStage.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const vpRect = cropperViewport.getBoundingClientRect();
+            const midX = e.clientX - vpRect.left;
+            const midY = e.clientY - vpRect.top;
+            const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+            let newScale = cropperScale * zoomFactor;
+            newScale = Math.min(cropperMaxScale, Math.max(cropperMinScale, newScale));
+
+            const origImgX = (midX - cropperPosX) / cropperScale;
+            const origImgY = (midY - cropperPosY) / cropperScale;
+            cropperPosX = midX - origImgX * newScale;
+            cropperPosY = midY - origImgY * newScale;
+            cropperScale = newScale;
+            updateCropperTransform();
+        }, { passive: false });
+    }
+
+    if (btnCropperCancel) {
+        btnCropperCancel.addEventListener('click', closeImageCropper);
+    }
+
+    if (cropperBackdrop) {
+        cropperBackdrop.addEventListener('click', (e) => {
+            if (e.target === cropperBackdrop) closeImageCropper();
+        });
+    }
+
+    if (btnCropperApply) {
+        btnCropperApply.addEventListener('click', async () => {
+            if (!cropperOriginalImgObj || !cropperTarget) {
+                closeImageCropper();
+                return;
+            }
+
+            const originalBtnText = btnCropperApply.innerHTML;
+            btnCropperApply.innerHTML = '<span>Guardando...</span>';
+            btnCropperApply.disabled = true;
+
+            try {
+                // Coordenadas de recorte sobre la imagen natural
+                const sourceX = Math.max(0, (0 - cropperPosX) / cropperScale);
+                const sourceY = Math.max(0, (0 - cropperPosY) / cropperScale);
+                const sourceWidth = Math.min(cropperImgNaturalWidth - sourceX, cropperViewportWidth / cropperScale);
+                const sourceHeight = Math.min(cropperImgNaturalHeight - sourceY, cropperViewportHeight / cropperScale);
+
+                const canvas = document.createElement('canvas');
+                if (cropperTarget === 'avatar') {
+                    canvas.width = 400;
+                    canvas.height = 400;
+                } else {
+                    canvas.width = 900;
+                    canvas.height = Math.round(900 * (cropperViewportHeight / cropperViewportWidth));
+                }
+
+                const ctx = canvas.getContext('2d');
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(
+                    cropperOriginalImgObj,
+                    sourceX,
+                    sourceY,
+                    sourceWidth,
+                    sourceHeight,
+                    0,
+                    0,
+                    canvas.width,
+                    canvas.height
+                );
+
+                const croppedBase64 = canvas.toDataURL('image/jpeg', 0.82);
+
+                if (cropperTarget === 'avatar') {
+                    await window.DB.updateProfile({ avatar: croppedBase64, customAvatar: true });
+                    if (profileAvatar) profileAvatar.src = croppedBase64;
+                    await renderProfileFeed();
+                } else if (cropperTarget === 'banner') {
+                    await window.DB.updateProfile({ banner: croppedBase64, customBanner: true });
+                    if (profileBanner) profileBanner.src = croppedBase64;
+                }
+
+                closeImageCropper();
+                setPhotoEditMode(false);
+            } catch (err) {
+                alert('Error al aplicar el recorte: ' + err.message);
+            } finally {
+                btnCropperApply.innerHTML = originalBtnText;
+                btnCropperApply.disabled = false;
+            }
+        });
+    }
+
+    // Interacción con avatar y banner
     if (profileAvatar && avatarFileInput) {
         profileAvatar.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -342,19 +667,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        avatarFileInput.addEventListener('change', async (e) => {
+        avatarFileInput.addEventListener('change', (e) => {
             const file = e.target.files && e.target.files[0];
             if (!file) return;
-            try {
-                const base64 = await window.DB.compressImage(file, 400, 0.75);
-                await window.DB.updateProfile({ avatar: base64, customAvatar: true });
-                profileAvatar.src = base64;
-                setPhotoEditMode(false);
-                await renderProfileFeed();
-            } catch (err) {
-                alert('Error al actualizar el avatar: ' + err.message);
-            }
-            avatarFileInput.value = '';
+            openImageCropper(file, 'avatar');
         });
     }
 
@@ -377,18 +693,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        bannerFileInput.addEventListener('change', async (e) => {
+        bannerFileInput.addEventListener('change', (e) => {
             const file = e.target.files && e.target.files[0];
             if (!file) return;
-            try {
-                const base64 = await window.DB.compressImage(file, 900, 0.75);
-                await window.DB.updateProfile({ banner: base64, customBanner: true });
-                profileBanner.src = base64;
-                setPhotoEditMode(false);
-            } catch (err) {
-                alert('Error al actualizar el banner: ' + err.message);
-            }
-            bannerFileInput.value = '';
+            openImageCropper(file, 'banner');
         });
     }
 
@@ -713,6 +1021,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
+            if (cropperBackdrop && cropperBackdrop.classList.contains('active')) {
+                closeImageCropper();
+                return;
+            }
             if (lightboxBackdrop && lightboxBackdrop.classList.contains('active')) {
                 closeImageLightbox();
             }
