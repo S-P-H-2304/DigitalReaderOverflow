@@ -1558,6 +1558,17 @@ a {
     transform: translate(-50%, -50%) scale(0.92);
 }
 
+/* ==========================================================================
+   UBICACIÓN DEL BOTÓN DE AUDIO (Hotspot de alarma - Cap 18 / Página 18)
+   Ajusta aquí su posición exacta en la pantalla:
+   - top: distancia vertical desde el borde superior (0% arriba, 100% abajo).
+   - left: distancia horizontal desde el borde izquierdo (0% izquierda, 100% derecha).
+   ========================================================================== */
+.hotspot-cap18 {
+    top: 33%;
+    left: 17%;
+}
+
 .audio-hotspot-icon {
     width: 1.35rem;
     height: 1.35rem;
@@ -3460,6 +3471,113 @@ a,
     90% {
         transform: translateX(calc(-50% + 2px));
     }
+}
+
+/* ==========================================================================
+   Splash Screen (Llenado Líquido y Oleaje SVG)
+   ========================================================================== */
+
+html.splash-already-shown #splash-screen {
+    display: none !important;
+}
+
+.splash-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    background: var(--bg-gradient);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    overflow: hidden;
+    pointer-events: all;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    transition: opacity 0.45s cubic-bezier(0.25, 1, 0.5, 1), transform 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.splash-screen.splash-fading {
+    opacity: 0;
+    transform: scale(1.05);
+    pointer-events: none;
+}
+
+.splash-screen.splash-hidden {
+    display: none !important;
+}
+
+.splash-logo-container {
+    position: relative;
+    width: min(70vw, 240px);
+    max-height: 48vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    will-change: transform, opacity;
+}
+
+.splash-logo-svg {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    display: block;
+}
+
+/* Silueta base sutil y translúcida */
+.splash-layer-silhouette {
+    color: rgba(255, 255, 255, 0.22);
+    opacity: 0.95;
+    transition: color 0.3s ease;
+}
+
+/* Capa de llenado blanco con resplandor suave */
+.splash-layer-fill {
+    color: #FFFFFF;
+    filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.4));
+    transition: filter 0.3s ease;
+}
+
+.splash-layer-fill.splash-fill-complete {
+    filter: drop-shadow(0 0 24px rgba(255, 255, 255, 0.75));
+}
+
+#splash-wave-rise-group {
+    transform: translateY(3600px);
+}
+
+/* Fallback de animaciones en CSS puro en caso de ausencia de GSAP */
+@keyframes splashWaveHorizontalCSS {
+    0% {
+        transform: translate3d(0, 0, 0);
+    }
+    100% {
+        transform: translate3d(-800px, 0, 0);
+    }
+}
+
+@keyframes splashWaveRiseCSS {
+    0% {
+        transform: translate3d(0, 3600px, 0);
+    }
+    100% {
+        transform: translate3d(0, -120px, 0);
+    }
+}
+
+.splash-css-fallback #splash-wave-shape {
+    animation: splashWaveHorizontalCSS 1.35s linear infinite;
+}
+
+.splash-css-fallback #splash-wave-rise-group {
+    animation: splashWaveRiseCSS 2.05s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 /* Accesibilidad: Respetar preferencia de reducción de movimiento */
