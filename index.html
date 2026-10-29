@@ -15,8 +15,10 @@
     <link rel="stylesheet" href="Styles/styles.css">
     <!-- Theme Loader -->
     <script>
-        const savedChapter = localStorage.getItem('activeChapter');
-        if (savedChapter) document.documentElement.setAttribute('data-chapter', savedChapter);
+        const savedChapter = localStorage.getItem('activeChapter') || localStorage.getItem('overflow_active_chapter') || '1';
+        localStorage.setItem('activeChapter', savedChapter);
+        localStorage.setItem('overflow_active_chapter', savedChapter);
+        document.documentElement.setAttribute('data-chapter', savedChapter);
     </script>
 </head>
 <body>

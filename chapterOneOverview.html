@@ -15,8 +15,11 @@
     <link rel="stylesheet" href="Styles/styles.css">
     <!-- Theme Loader -->
     <script>
-        const savedChapter = localStorage.getItem('activeChapter');
-        if (savedChapter) document.documentElement.setAttribute('data-chapter', savedChapter);
+        const urlChapter = new URLSearchParams(window.location.search).get('chapter');
+        const savedChapter = urlChapter || localStorage.getItem('activeChapter') || localStorage.getItem('overflow_active_chapter') || '1';
+        localStorage.setItem('activeChapter', savedChapter);
+        localStorage.setItem('overflow_active_chapter', savedChapter);
+        document.documentElement.setAttribute('data-chapter', savedChapter);
     </script>
 </head>
 <body>
@@ -31,26 +34,37 @@
         <section class="chapter-overview">
             <div class="slides-container">
                 <article class="chapter-slide active-slide">
-                    <img src="Images/cap1Cover.jpg" alt="Portada del capítulo 1" class="chapter-card-overview">
+                    <img src="Images/cap1Cover.jpg" alt="Portada del capítulo 1" class="chapter-card-overview" id="overview-cover-img">
                 </article>
-                <article class="chapter-slide" id="chapter-slide-sinopsis">
+                <article class="chapter-slide chapter-slide-card" id="chapter-slide-sinopsis">
                     <h2>Sinopsis</h2>
-                    <p>Tras escapar de la ciudad submarina a bordo de la cápsula D-070, Dimitri emerge a un océano infinito castigado por una lluvia incesante. Desconectado de todo, se enfrenta a la hostilidad de un nuevo mundo que hasta entonces solo conocía desde las profundidades, con la única compañía de su diario, unas fotografías del planeta del ayer y la memoria de sus padres.</p>
-                    <p>Completamente a la deriva, Dimitri pasa los días atrapado entre recuerdos, arrepentimientos, miedo y una paranoia que lo carcome, consciente de que ahora está solo y ya no tiene un hogar al cual volver.</p>
+                    <div id="overview-sinopsis-body" class="overview-slide-content">
+                        <p id="overview-sinopsis-text">En un mundo donde la lluvia no cesa y los océanos cubren todo el horizonte, Dimitri emerge a la superficie con vida, pero completamente solo. Sin un hogar al cual volver y con sus recuerdos a cuestas, deberá soportar la inmensidad del mar y el peso de su propia paranoia, con su diario como único testigo de lo que alguna vez fue.</p>
+                    </div>
                 </article>
-                <article class="chapter-slide" id="chapter-slide-sinopsis">
+                <article class="chapter-slide chapter-slide-card" id="chapter-slide-creditos">
                     <h2>Créditos y agradecimientos</h2>
-                    <p></p>
+                    <div id="overview-credits-body" class="overview-slide-content overview-credits-content">
+                        <div class="credits-group">
+                            <p><strong>Guionista:</strong> Sebastián Pérez Henao</p>
+                            <p><strong>Ilustradora:</strong> Nathalia Muñoz Padilla</p>
+                            <p><strong>Agradecimientos especiales:</strong> A nuestros patrocinadores por hacer posible el financiamiento de este primer capítulo y brindarnos como empresa la oportunidad de publicarlo al público de manera gratuita.</p>
+                        </div>
+                        <div class="credits-copyright">
+                            <p>© 2026 <em>Overflow: Diarios de un prófugo</em>. Todos los derechos reservados.</p>
+                            <p>Queda prohibida la reproducción, distribución, comunicación pública o transformación total o parcial de esta obra gráfica, literaria y multimedia sin la autorización expresa de sus titulares de derechos de autor.</p>
+                        </div>
+                    </div>
                 </article>
             </div>
             <div class="carousel-indicators" role="group" aria-label="Diapositivas del carrusel">
-                <button type="button" class="carousel-indicator active-carousel-indicator" aria-current="true" aria-label="Portada del capítulo 1"></button>
-                <button type="button" class="carousel-indicator" aria-label="Reseñas del capítulo 1"></button>
-                <button type="button" class="carousel-indicator" aria-label="Créditos del capítulo 1"></button>
+                <button type="button" class="carousel-indicator active-carousel-indicator" aria-current="true" aria-label="Portada del capítulo"></button>
+                <button type="button" class="carousel-indicator" aria-label="Sinopsis del capítulo"></button>
+                <button type="button" class="carousel-indicator" aria-label="Créditos del capítulo"></button>
             </div>
         </section>
         <div class="chapter-content">
-            <h1 class="chapter-title">Capítulo 1: A la deriva</h1>
+            <h1 class="chapter-title" id="overview-chapter-title">Capítulo 1: A la deriva</h1>
         </div>
         <section class="chapter-info-start">
             <div class="chapter-info">
@@ -72,12 +86,12 @@
                     </li>
                     <li class="chapter-info-item">
                         <span class="sr-only">Paneles leídos: </span>
-                        <span class="js-progress" id="overview-chapter-progress">0/12</span>
+                        <span class="js-progress" id="overview-chapter-progress">0/32</span>
                     </li>
                 </ul>
             </div>
             <div class="start-reading-container">
-                <a href="chapterReader.html" class="cta-button">Empezar a leer</a>
+                <a href="chapterReader.html" class="cta-button" id="overview-cta-btn">Empezar a leer</a>
             </div>
         </section>
     </main>

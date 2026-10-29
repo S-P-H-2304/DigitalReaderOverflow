@@ -107,7 +107,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- MANEJO DE ELEMENTOS EXTRA (PLAY Y CLASES) ---
+    // --- MANEJO DE ELEMENTOS EXTRA (PLAY / LOCK Y CLASES) ---
+    const PLAY_ICON_SVG = `<svg viewBox="0 0 40 45" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M37.9781 25.9831L6.1647 44.4405C3.46483 46.0053 0 44.1106 0 40.956V4.04117C0 0.891615 3.45983 -1.00812 6.1647 0.561661L37.9781 19.0191C38.5923 19.3696 39.1028 19.8764 39.4579 20.4879C39.813 21.0994 40 21.794 40 22.5011C40 23.2082 39.813 23.9027 39.4579 24.5143C39.1028 25.1258 38.5923 25.6325 37.9781 25.9831Z" fill="#D4DBE4" fill-opacity="0.85"/>
+    </svg>`;
+
+    const LOCK_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-lock" viewBox="0 0 16 16">
+        <path fill-rule="evenodd" d="M8 0a4 4 0 0 1 4 4v2.05a2.5 2.5 0 0 1 2 2.45v5a2.5 2.5 0 0 1-2.5 2.5h-7A2.5 2.5 0 0 1 2 13.5v-5a2.5 2.5 0 0 1 2-2.45V4a4 4 0 0 1 4-4M4.5 7A1.5 1.5 0 0 0 3 8.5v5A1.5 1.5 0 0 0 4.5 15h7a1.5 1.5 0 0 0 1.5-1.5v-5A1.5 1.5 0 0 0 11.5 7zM8 1a3 3 0 0 0-3 3v2h6V4a3 3 0 0 0-3-3"/>
+    </svg>`;
+
     const playButton = carousel.querySelector('.chapter-card-active button')
         || carousel.querySelector('button');
 
@@ -126,123 +134,86 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-
-
     function updateExtraElements() {
-
         cards.forEach(card => {
-
             const img = card.querySelector('img');
-
             if (img) img.classList.remove('chapter-card-active-image');
-
         });
 
-
-
         const activeCard = carousel.querySelector('.chapter-card-active');
-
         if (activeCard) {
-
             const img = activeCard.querySelector('img');
-
             if (img) img.classList.add('chapter-card-active-image');
 
-
-
-            // appendChild mueve el nodo existente (no lo duplica)
-
-            if (playButton && playButton.parentNode !== activeCard) {
-
-                activeCard.appendChild(playButton);
-
+            const chapterId = activeCard.getAttribute('data-chapter-id') || '1';
+            if (playButton) {
+                if (playButton.parentNode !== activeCard) {
+                    activeCard.appendChild(playButton);
+                }
+                const isLocked = chapterId !== '1';
+                playButton.classList.toggle('is-locked-chapter', isLocked);
+                playButton.setAttribute('aria-label', isLocked ? `Capítulo ${chapterId} bloqueado` : `Reproducir capítulo ${chapterId}`);
+                playButton.innerHTML = isLocked ? LOCK_ICON_SVG : PLAY_ICON_SVG;
             }
-
         }
-
     }
 
 
 
     // --- ACTUALIZACION DEL TEMA ---
+    function syncActiveChapterStorage(chapterId) {
+        if (!chapterId) return;
+        const id = String(chapterId);
+        localStorage.setItem('activeChapter', id);
+        localStorage.setItem('overflow_active_chapter', id);
+        if (window.DB && typeof window.DB.setActiveChapter === 'function') {
+            window.DB.setActiveChapter(id);
+        }
+    }
 
     function updateTheme() {
-
         const activeCard = carousel.querySelector('.chapter-card-active');
+        if (!activeCard) return;
 
-        if (activeCard) {
+        const chapterId = activeCard.getAttribute('data-chapter-id');
+        if (!chapterId) return;
 
-            const chapterId = activeCard.getAttribute('data-chapter-id');
+        if (document.documentElement.getAttribute('data-chapter') !== chapterId) {
+            // Limpiar faders previos si se deslizó rápido
+            document.querySelectorAll('.theme-bg-fader').forEach(el => el.remove());
 
-            if (chapterId && document.documentElement.getAttribute('data-chapter') !== chapterId) {
+            // 1. Capturamos el fondo viejo antes del cambio
+            const oldBg = getComputedStyle(document.body).background;
 
-                
+            // 2. Creamos un elemento para el crossfade manual del fondo
+            const fader = document.createElement('div');
+            fader.className = 'theme-bg-fader';
+            fader.style.position = 'fixed';
+            fader.style.top = '0';
+            fader.style.left = '0';
+            fader.style.width = '100vw';
+            fader.style.height = '100dvh';
+            fader.style.background = oldBg;
+            fader.style.zIndex = '-1'; // Detrás de todo
+            fader.style.pointerEvents = 'none';
+            fader.style.transition = 'opacity 0.6s ease';
+            document.body.appendChild(fader);
 
-                // 1. Capturamos el fondo viejo antes del cambio
+            // 3. Aplicamos el nuevo tema instantáneamente detrás del fader
+            document.documentElement.setAttribute('data-chapter', chapterId);
+            syncActiveChapterStorage(chapterId);
 
-                const oldBg = getComputedStyle(document.body).background;
+            // 4. Hacemos que el fader desaparezca suavemente
+            void fader.offsetHeight;
+            fader.style.opacity = '0';
 
-                
-
-                // 2. Creamos un elemento para el crossfade manual del fondo
-
-                const fader = document.createElement('div');
-
-                fader.style.position = 'fixed';
-
-                fader.style.top = '0';
-
-                fader.style.left = '0';
-
-                fader.style.width = '100vw';
-                fader.style.height = '100dvh';
-
-                fader.style.background = oldBg;
-
-                fader.style.zIndex = '-1'; // Detrás de todo
-
-                fader.style.pointerEvents = 'none';
-
-                fader.style.transition = 'opacity 0.6s ease';
-
-                document.body.appendChild(fader);
-
-                
-
-                // 3. Aplicamos el nuevo tema (el body cambiará su fondo instantáneamente detrás del fader)
-
-                document.documentElement.setAttribute('data-chapter', chapterId);
-
-                if (window.DB) {
-                    window.DB.setActiveChapter(chapterId);
-                } else {
-                    localStorage.setItem('activeChapter', chapterId);
-                }
-
-                
-
-                // 4. Hacemos que el fader desaparezca suavemente
-
-                // Forzamos reflow para que la transición funcione
-
-                fader.offsetHeight; 
-
-                fader.style.opacity = '0';
-
-                
-
-                // 5. Limpiamos el DOM una vez terminada la transición
-
-                setTimeout(() => {
-
-                    if(fader.parentNode) fader.remove();
-
-                }, 600);
-
-            }
-
+            // 5. Limpiamos el DOM una vez terminada la transición
+            setTimeout(() => {
+                if (fader.parentNode) fader.remove();
+            }, 600);
+        } else {
+            syncActiveChapterStorage(chapterId);
         }
-
     }
 
 
@@ -355,12 +326,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 const chapterId = card.getAttribute('data-chapter-id') || '1';
-                if (chapterId === '1') {
-                    window.location.href = 'chapterOneOverview.html';
-                } else {
-                    if (playButton) triggerRestrictedShake(playButton);
-                    showChapterLockedToast(chapterId);
-                }
+                document.documentElement.setAttribute('data-chapter', chapterId);
+                syncActiveChapterStorage(chapterId);
+                window.location.href = `chapterOneOverview.html?chapter=${chapterId}`;
             }
 
         });
@@ -566,20 +534,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     
 
-    // Iniciar
-    async function initCarousel() {
-        const savedChapter = window.DB 
-            ? (await window.DB.getActiveChapter()) 
-            : (localStorage.getItem('activeChapter') || '1');
+    // Iniciar de forma síncrona para evitar cualquier parpadeo o desfase de paleta
+    function initCarousel() {
+        const savedChapter = localStorage.getItem('activeChapter')
+            || localStorage.getItem('overflow_active_chapter')
+            || '1';
 
-        if (savedChapter && savedChapter !== '1') {
-            restoreActiveChapterQuietly(savedChapter);
-        }
+        restoreActiveChapterQuietly(savedChapter);
+        document.documentElement.setAttribute('data-chapter', savedChapter);
+        syncActiveChapterStorage(savedChapter);
         updateExtraElements();
-        updateTheme();
     }
 
     initCarousel();
+
+    window.addEventListener('pageshow', () => {
+        initCarousel();
+    });
 
 });
 

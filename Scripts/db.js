@@ -27,8 +27,15 @@
     const DEFAULT_AVATAR = 'Images/default-avatar.svg';
     const DEFAULT_BANNER = 'Images/default-banner.svg';
     const DEFAULT_CURRENT_USER_ID = 'user_mclovin';
-    const TOTAL_CHAPTER_1_PANELS = 12;
+    const TOTAL_CHAPTER_1_PANELS = 32;
     const USERNAME_REGEX = /^[a-zA-Z0-9_.]{3,20}$/;
+
+    function getChapterPanelCount(chapter) {
+        return Math.max(
+            typeof chapter.totalPanels === 'number' ? chapter.totalPanels : 0,
+            TOTAL_CHAPTER_1_PANELS
+        );
+    }
 
     function validateUsernameFormat(username) {
         const clean = String(username || '').trim();
@@ -218,10 +225,14 @@
     }
 
     function initLocalCache() {
-        if (!localStorage.getItem(STORAGE_KEYS.ACTIVE_CHAPTER)) {
-            const oldChapter = localStorage.getItem('activeChapter') || '1';
-            localStorage.setItem(STORAGE_KEYS.ACTIVE_CHAPTER, oldChapter);
-        }
+        const urlChapter = new URLSearchParams(window.location.search).get('chapter');
+        const activeCh = urlChapter
+            || localStorage.getItem('activeChapter')
+            || localStorage.getItem(STORAGE_KEYS.ACTIVE_CHAPTER)
+            || '1';
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_CHAPTER, activeCh);
+        localStorage.setItem('activeChapter', activeCh);
+        document.documentElement.setAttribute('data-chapter', activeCh);
         if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
             localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(SEED_USERS));
         }
@@ -331,7 +342,7 @@
         if (overviewProgressEl) {
             const chapters = getStoredJSON(STORAGE_KEYS.CHAPTERS, SEED_CHAPTERS);
             const ch = chapters['chapter_1'] || SEED_CHAPTERS['chapter_1'];
-            const totalPanels = ch.totalPanels || TOTAL_CHAPTER_1_PANELS;
+            const totalPanels = getChapterPanelCount(ch);
             const readPanels = (user.chapterProgress && typeof user.chapterProgress['chapter_1'] === 'number')
                 ? Math.min(totalPanels, Math.max(0, user.chapterProgress['chapter_1']))
                 : 0;
@@ -348,7 +359,7 @@
         const hasLiked = Array.isArray(ch.likes) && ch.likes.includes(activeUid);
         const likesCount = typeof ch.likesCount === 'number' ? ch.likesCount : 1200;
         const viewsCount = typeof ch.viewsCount === 'number' ? ch.viewsCount : 2700;
-        const totalPanels = ch.totalPanels || TOTAL_CHAPTER_1_PANELS;
+        const totalPanels = getChapterPanelCount(ch);
 
         // En chapterReader.html
         const chapterLikesCountEl = document.getElementById('chapter-likes-count');
@@ -673,15 +684,30 @@
                 needsUpdate = true;
             }
 
-            if (needsUpdate) {
-                await fsModRef.setDoc(userRef, updates, { merge: true });
-            }
+            const urlChapter = new URLSearchParams(window.location.search).get('chapter');
+            const localChapter = urlChapter
+                || localStorage.getItem('activeChapter')
+                || localStorage.getItem(STORAGE_KEYS.ACTIVE_CHAPTER);
 
-            if (data.activeChapter) {
+            if (localChapter) {
+                const ch = String(localChapter);
+                localStorage.setItem(STORAGE_KEYS.ACTIVE_CHAPTER, ch);
+                localStorage.setItem('activeChapter', ch);
+                document.documentElement.setAttribute('data-chapter', ch);
+                if (String(data.activeChapter || '') !== ch) {
+                    updates.activeChapter = ch;
+                    data.activeChapter = ch;
+                    needsUpdate = true;
+                }
+            } else if (data.activeChapter) {
                 const ch = String(data.activeChapter);
                 localStorage.setItem(STORAGE_KEYS.ACTIVE_CHAPTER, ch);
                 localStorage.setItem('activeChapter', ch);
                 document.documentElement.setAttribute('data-chapter', ch);
+            }
+
+            if (needsUpdate) {
+                await fsModRef.setDoc(userRef, updates, { merge: true });
             }
 
             if (typeof data.volume === 'number') {
@@ -775,10 +801,10 @@
                 await fsModRef.setDoc(cRef, SEED_CHAPTERS[chId]);
             } else {
                 const cData = cSnap.data();
-                if (typeof cData.viewsCount !== 'number' || typeof cData.totalPanels !== 'number') {
+                if (typeof cData.viewsCount !== 'number' || typeof cData.totalPanels !== 'number' || cData.totalPanels < TOTAL_CHAPTER_1_PANELS) {
                     await fsModRef.setDoc(cRef, {
                         viewsCount: typeof cData.viewsCount === 'number' ? cData.viewsCount : 2700,
-                        totalPanels: typeof cData.totalPanels === 'number' ? cData.totalPanels : TOTAL_CHAPTER_1_PANELS
+                        totalPanels: Math.max(typeof cData.totalPanels === 'number' ? cData.totalPanels : 0, TOTAL_CHAPTER_1_PANELS)
                     }, { merge: true });
                 }
             }
@@ -1400,9 +1426,14 @@
         // 1. CAPÍTULOS, LIKES, VISTAS Y PROGRESO
         // ==========================================
         async getActiveChapter() {
-            return localStorage.getItem(STORAGE_KEYS.ACTIVE_CHAPTER)
+            const urlChapter = new URLSearchParams(window.location.search).get('chapter');
+            const ch = urlChapter
                 || localStorage.getItem('activeChapter')
+                || localStorage.getItem(STORAGE_KEYS.ACTIVE_CHAPTER)
                 || '1';
+            localStorage.setItem(STORAGE_KEYS.ACTIVE_CHAPTER, ch);
+            localStorage.setItem('activeChapter', ch);
+            return ch;
         },
 
         async setActiveChapter(chapterId) {
@@ -1486,7 +1517,7 @@
 
             const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
             const activeUser = users[currentUserId];
-            const totalPanels = typeof ch.totalPanels === 'number' ? ch.totalPanels : TOTAL_CHAPTER_1_PANELS;
+            const totalPanels = getChapterPanelCount(ch);
             const panelsRead = (activeUser && activeUser.chapterProgress && typeof activeUser.chapterProgress[chapterId] === 'number')
                 ? Math.min(totalPanels, Math.max(0, activeUser.chapterProgress[chapterId]))
                 : 0;
@@ -1530,7 +1561,7 @@
                             likes: Array.isArray(ch.likes) ? ch.likes : [],
                             likesCount: typeof ch.likesCount === 'number' ? ch.likesCount : 1200,
                             viewsCount: ch.viewsCount,
-                            totalPanels: ch.totalPanels || TOTAL_CHAPTER_1_PANELS
+                            totalPanels: getChapterPanelCount(ch)
                         }, { merge: true });
                     } catch (e) {}
                 }
@@ -1613,7 +1644,7 @@
                             likes: ch.likes,
                             likesCount: ch.likesCount,
                             viewsCount: typeof ch.viewsCount === 'number' ? ch.viewsCount : 2700,
-                            totalPanels: ch.totalPanels || TOTAL_CHAPTER_1_PANELS
+                            totalPanels: getChapterPanelCount(ch)
                         }, { merge: true });
                     } catch (e) {
                         console.warn('[Firestore toggleChapterLike Sync Warning]', e);
