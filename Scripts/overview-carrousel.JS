@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             id: 'chapter_1',
             number: '1',
             title: 'Capítulo 1: A la deriva',
-            cover: 'Images/cap1Cover.jpg',
+            cover: 'Images/portada1.jpg',
             locked: false,
             synopsis: 'En un mundo donde la lluvia no cesa y los océanos cubren todo el horizonte, Dimitri emerge a la superficie con vida, pero completamente solo. Sin un hogar al cual volver y con sus recuerdos a cuestas, deberá soportar la inmensidad del mar y el peso de su propia paranoia, con su diario como único testigo de lo que alguna vez fue.',
             creditsHtml: `
@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             id: 'chapter_2',
             number: '2',
             title: 'Capítulo 2: Carroñeros del mar',
-            cover: 'Images/cap1Cover.jpg',
+            cover: 'Images/Portada2.jpg',
             locked: true,
             synopsis: 'Atrapado en un inmenso islote flotante de chatarra y desechos, Dimitri se ve forzado a ocultar su verdadera identidad bajo el nombre de Ren Takahashi. En medio de un entorno hostil y lleno de sospechas, solo el inesperado vínculo con Copper, un niño huérfano del asentamiento, le brindará un motivo real de esperanza.',
             creditsHtml: `
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             id: 'chapter_3',
             number: '3',
             title: 'Capítulo 3: El evangelio del diluvio',
-            cover: 'Images/cap1Cover.jpg',
+            cover: 'Images/Portada3.jpg',
             locked: true,
             synopsis: 'Vendido a los devotos del Arca 4, Dimitri descubre un lugar insólito donde la comunidad y la superficie parecen sacadas de otro tiempo. Sin embargo, su llegada altera la paz del navío cuando El Apóstol reconoce su rostro y saca a la luz un oscuro secreto.',
             creditsHtml: `
@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             id: 'chapter_4',
             number: '4',
             title: 'Capítulo 4: El valor del planeta',
-            cover: 'Images/cap1Cover.jpg',
+            cover: 'Images/Portada4.jpg',
             locked: true,
             synopsis: 'Tras los reveladores descubrimientos sobre el Proyecto ARCA, Kael decide respaldar a su amigo y huir con él hacia la megaciudad flotante. Ocultos en la marginalidad de la urbe, ambos enfrentarán el peligro mientras Dimitri comprende que después de tanto aislamiento, ya no está solo.',
             creditsHtml: `

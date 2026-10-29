@@ -89,36 +89,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 2. SISTEMA DE AUDIO AMBIENTAL Y EFECTOS INTERACTIVOS (READER AUDIO MANAGER)
     // =========================================================================
     const CHAPTER_AUDIO_CONFIG = {
-        ambientTracks: [
-            { id: 'calm', src: 'Audio/ambient-calm.wav', pages: [1, 4] },
-            { id: 'tension', src: 'Audio/ambient-tension.wav', pages: [5, 8] },
-            { id: 'climax', src: 'Audio/ambient-climax.wav', pages: [9, 12] }
-        ],
-        crossfadeDuration: 1.2, // segundos de transición entre pistas
-        duckingFactor: 0.25      // factor de atenuación de fondo mientras suena un efecto
+        backgroundAudioSrc: 'Audio/Rain.wav',
+        ambientAttenuation: 0.30, // Nivel atenuado para que la lluvia ambiental no sature la lectura
+        duckingFactor: 0.20       // Atenuación adicional cuando suena la alarma
     };
 
     const ReaderAudioManager = (() => {
-        let ambientA = new Audio();
-        let ambientB = new Audio();
-        ambientA.loop = true;
-        ambientB.loop = true;
-        ambientA.preload = 'auto';
-        ambientB.preload = 'auto';
+        const ambientAudio = new Audio(CHAPTER_AUDIO_CONFIG.backgroundAudioSrc);
+        ambientAudio.loop = true;
+        ambientAudio.preload = 'auto';
 
-        let activeAmbient = ambientA;
-        let standbyAmbient = ambientB;
-        let currentTrackId = null;
         let isDucking = false;
         let masterVolumeRatio = 0.8;
         let isAudioUnlocked = false;
-        let currentVisiblePage = 1;
+
+        let activeHotspotAudio = null;
+        let activeHotspotBtn = null;
+        let hotspotTimeout = null;
 
         function getTargetAmbientVolume() {
             if (masterVolumeRatio <= 0) return 0;
-            return isDucking 
-                ? masterVolumeRatio * CHAPTER_AUDIO_CONFIG.duckingFactor 
-                : masterVolumeRatio;
+            const base = masterVolumeRatio * CHAPTER_AUDIO_CONFIG.ambientAttenuation;
+            return isDucking ? (base * CHAPTER_AUDIO_CONFIG.duckingFactor) : base;
         }
 
         function fadeAudio(audio, targetVol, durationSec, onComplete) {
@@ -141,39 +133,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             requestAnimationFrame(step);
         }
 
-        function playAmbientForPage(pageNum) {
-            const track = CHAPTER_AUDIO_CONFIG.ambientTracks.find(
-                t => pageNum >= t.pages[0] && pageNum <= t.pages[1]
-            );
-            if (!track || track.id === currentTrackId) return;
-
-            currentTrackId = track.id;
-            if (!isAudioUnlocked) return; // Se iniciará cuando el usuario interactúe
-
-            // Crossfade suave hacia la nueva pista
-            standbyAmbient.src = track.src;
-            standbyAmbient.currentTime = 0;
-            standbyAmbient.volume = 0;
-
-            const playPromise = standbyAmbient.play();
-            if (playPromise !== undefined) {
-                playPromise.then(() => {
-                    const targetVol = getTargetAmbientVolume();
-                    fadeAudio(standbyAmbient, targetVol, CHAPTER_AUDIO_CONFIG.crossfadeDuration);
-                    fadeAudio(activeAmbient, 0, CHAPTER_AUDIO_CONFIG.crossfadeDuration, () => {
-                        activeAmbient.pause();
-                        activeAmbient.currentTime = 0;
-                        // Intercambiar activo y standby
-                        const temp = activeAmbient;
-                        activeAmbient = standbyAmbient;
-                        standbyAmbient = temp;
-                    });
-                }).catch(err => {
-                    console.warn('[ReaderAudio] Autoplay en espera de interacción:', err);
-                });
-            }
-        }
-
         function unlockAndStartAudio() {
             if (isAudioUnlocked) return;
             isAudioUnlocked = true;
@@ -182,80 +141,114 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.removeEventListener('click', unlockAndStartAudio);
             if (visor) visor.removeEventListener('scroll', unlockAndStartAudio);
 
-            // Iniciar pista ambiental de la página actual
-            const track = CHAPTER_AUDIO_CONFIG.ambientTracks.find(
-                t => currentVisiblePage >= t.pages[0] && currentVisiblePage <= t.pages[1]
-            );
-            if (track) {
-                currentTrackId = track.id;
-                activeAmbient.src = track.src;
-                activeAmbient.currentTime = 0;
-                activeAmbient.volume = 0;
-                const p = activeAmbient.play();
-                if (p !== undefined) {
-                    p.then(() => {
-                        fadeAudio(activeAmbient, getTargetAmbientVolume(), 1.0);
-                    }).catch(() => {});
-                }
+            ambientAudio.volume = 0;
+            const p = ambientAudio.play();
+            if (p !== undefined) {
+                p.then(() => {
+                    fadeAudio(ambientAudio, getTargetAmbientVolume(), 1.2);
+                }).catch((err) => {
+                    console.warn('[ReaderAudio] Autoplay en espera de interacción:', err);
+                    isAudioUnlocked = false;
+                });
             }
         }
 
         function setMasterVolume(ratio) {
             masterVolumeRatio = Math.max(0, Math.min(1, Number(ratio) || 0));
-            if (activeAmbient) {
-                activeAmbient.volume = getTargetAmbientVolume();
+            if (ambientAudio) {
+                ambientAudio.volume = getTargetAmbientVolume();
+            }
+            if (activeHotspotAudio) {
+                activeHotspotAudio.volume = masterVolumeRatio;
             }
         }
 
         function applyDucking(enable) {
             isDucking = Boolean(enable);
-            if (activeAmbient) {
-                fadeAudio(activeAmbient, getTargetAmbientVolume(), 0.35);
+            if (ambientAudio) {
+                fadeAudio(ambientAudio, getTargetAmbientVolume(), 0.35);
             }
         }
 
-        function playHotspotSound(btn, soundSrc) {
+        function stopHotspotSound() {
+            if (activeHotspotAudio) {
+                try {
+                    activeHotspotAudio.pause();
+                    activeHotspotAudio.currentTime = 0;
+                } catch (e) {}
+                activeHotspotAudio = null;
+            }
+            if (activeHotspotBtn) {
+                activeHotspotBtn.classList.remove('is-playing');
+                activeHotspotBtn.setAttribute('aria-pressed', 'false');
+                activeHotspotBtn.setAttribute('aria-label', 'Reproducir efecto sonoro de alarma');
+                activeHotspotBtn = null;
+            }
+            if (hotspotTimeout) {
+                clearTimeout(hotspotTimeout);
+                hotspotTimeout = null;
+            }
+            applyDucking(false);
+        }
+
+        function toggleHotspotSound(btn, soundSrc) {
             if (!soundSrc) return;
+
+            // Si el botón ya está reproduciéndose, detenerlo inmediatamente
+            if (activeHotspotBtn === btn && activeHotspotAudio) {
+                stopHotspotSound();
+                return;
+            }
+
+            // Si había otro sonido activo, detenerlo limpiamente antes de iniciar el nuevo
+            stopHotspotSound();
+
             unlockAndStartAudio();
 
-            const sfx = new Audio(soundSrc);
+            // Asegurar codificación limpia de la ruta del archivo (ej. alarm call.wav)
+            const safeSrc = encodeURI(soundSrc).replace(/%2520/g, '%20');
+            const sfx = new Audio(safeSrc);
             sfx.volume = masterVolumeRatio;
 
+            activeHotspotAudio = sfx;
+            activeHotspotBtn = btn;
+
             btn.classList.add('is-playing');
+            btn.setAttribute('aria-pressed', 'true');
+            btn.setAttribute('aria-label', 'Detener efecto sonoro de alarma');
             applyDucking(true);
 
-            let hasCleanedUp = false;
             const cleanup = () => {
-                if (hasCleanedUp) return;
-                hasCleanedUp = true;
-                btn.classList.remove('is-playing');
-                applyDucking(false);
+                if (activeHotspotAudio === sfx) {
+                    stopHotspotSound();
+                }
             };
 
             sfx.addEventListener('ended', cleanup, { once: true });
             sfx.addEventListener('error', cleanup, { once: true });
-            setTimeout(cleanup, 4500); // Timeout de seguridad
+            // Tiempo límite de seguridad (la alarma dura 6s, margen a 8s)
+            hotspotTimeout = setTimeout(cleanup, 8000);
 
             const p = sfx.play();
             if (p !== undefined) {
-                p.catch(cleanup);
+                p.catch(() => {
+                    cleanup();
+                });
             }
         }
 
-        function onPageChanged(pageNum) {
-            if (pageNum !== currentVisiblePage) {
-                currentVisiblePage = pageNum;
-                playAmbientForPage(pageNum);
-            }
+        function onPageChanged() {
+            // La lluvia ambiental permanece siempre activa en todo el capítulo
         }
 
         function pauseAll() {
-            if (activeAmbient) activeAmbient.pause();
+            if (ambientAudio) ambientAudio.pause();
+            stopHotspotSound();
         }
 
         function resumeAmbient() {
-            if (isAudioUnlocked && activeAmbient && currentTrackId && activeAmbient.paused) {
-                activeAmbient.play().catch(() => {});
+            if (isAudioUnlocked && ambientAudio && ambientAudio.paused && masterVolumeRatio > 0) {
+                ambientAudio.play().catch(() => {});
             }
         }
 
@@ -274,7 +267,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         return {
             setMasterVolume,
-            playHotspotSound,
+            playHotspotSound: toggleHotspotSound,
+            toggleHotspotSound,
+            stopHotspotSound,
             onPageChanged,
             pauseAll,
             resumeAmbient
@@ -287,7 +282,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const soundSrc = btn.getAttribute('data-sound');
-            ReaderAudioManager.playHotspotSound(btn, soundSrc);
+            ReaderAudioManager.toggleHotspotSound(btn, soundSrc);
             if (window.Motion && window.Motion.popReaderControl) {
                 window.Motion.popReaderControl(btn);
             }

@@ -491,9 +491,12 @@ a {
 
 .chapter-card-overview {
     width: 100%;
-    height: auto;
+    height: 100%;
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
     border-radius: 2rem;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    display: block;
 }
 
 .carousel-indicators {
@@ -520,6 +523,9 @@ a {
 .slides-container {
     display: grid;
     width: 100%;
+    aspect-ratio: 2 / 3;
+    border-radius: 2rem;
+    overflow: hidden;
 }
 
 .chapter-slide {
@@ -1580,11 +1586,17 @@ a {
 .audio-hotspot.is-playing {
     background: var(--button-bg);
     color: #FFFFFF;
-    border-color: rgba(255, 255, 255, 0.6);
+    border-color: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 0 16px var(--accent-color), 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
 .audio-hotspot.is-playing .audio-hotspot-icon {
-    animation: hotspotWave 0.7s infinite alternate ease-in-out;
+    animation: hotspotWave 0.5s infinite alternate ease-in-out;
+}
+
+.audio-hotspot.is-playing .audio-hotspot-ping {
+    border-color: #FFFFFF;
+    animation: hotspotPing 1.2s infinite cubic-bezier(0, 0, 0.2, 1);
 }
 
 @keyframes hotspotWave {

@@ -146,7 +146,7 @@
             content: '¡Acabo de releer el Capítulo 1: A la deriva! El cambio de paleta es brutal. ¿Qué esperan del próximo capítulo?',
             media: {
                 type: 'image',
-                url: 'Images/cap1Cover.jpg'
+                url: 'Images/portada1.jpg'
             },
             likes: ['user_other'],
             dislikes: [],
