@@ -1635,11 +1635,16 @@ a {
 }
 
 /* ==========================================================================
-   UBICACIÓN DEL BOTÓN DE AUDIO (Hotspot de alarma - Cap 18 / Página 18)
-   Ajusta aquí su posición exacta en la pantalla:
+   UBICACIÓN DE LOS BOTONES DE AUDIO (Hotspots en páginas del lector)
+   Ajusta aquí la posición exacta en pantalla de cada hotspot:
    - top: distancia vertical desde el borde superior (0% arriba, 100% abajo).
    - left: distancia horizontal desde el borde izquierdo (0% izquierda, 100% derecha).
    ========================================================================== */
+.hotspot-cap7 {
+    top: 55%;
+    left: 20%;
+}
+
 .hotspot-cap18 {
     top: 33%;
     left: 17%;
@@ -3019,6 +3024,8 @@ a,
 
 .reader-top-pill {
     position: relative;
+    padding: 0.5rem 0.75rem;
+    gap: 0.85rem;
 }
 
 .reader-action-anchor {
@@ -3227,7 +3234,7 @@ a,
 .reader-chapters-popover {
     position: absolute;
     top: calc(100% + 0.85rem);
-    right: clamp(-2.6rem, -5vw, -0.75rem);
+    right: -0.25rem;
     width: min(18.5rem, calc(100vw - 1.5rem));
     padding: clamp(0.7rem, 2.5vw, 0.9rem);
     border-radius: 1.35rem;

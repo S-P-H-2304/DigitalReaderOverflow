@@ -88,39 +88,79 @@ document.addEventListener('DOMContentLoaded', async () => {
     // =========================================================================
     // 2. SISTEMA DE AUDIO AMBIENTAL Y EFECTOS INTERACTIVOS (READER AUDIO MANAGER)
     // =========================================================================
+    // Ajusta aquí los volúmenes individuales (de 0.0 a 1.0 respecto al volumen general):
     const CHAPTER_AUDIO_CONFIG = {
-        backgroundAudioSrc: 'Audio/Rain.wav',
-        ambientAttenuation: 0.30, // Nivel atenuado para que la lluvia ambiental no sature la lectura
-        duckingFactor: 0.20       // Atenuación adicional cuando suena la alarma
+        tracks: {
+            rain:  { src: 'Audio/Rain.wav',  attenuation: 0.30 }, // Págs: 1-5, 13-16, 27-32
+            barco: { src: 'Audio/Barco.WAV', attenuation: 0.30 }  // Págs: 6-12, 17-26
+        },
+        hotspotVolumes: {
+            'Audio/Canica.WAV':     1.0, // Hotspot página 7 (Canica)
+            'Audio/alarm call.wav': 1.0  // Hotspot página 18 (Alarma)
+        },
+        duckingFactor: 0.20,       // Atenuación adicional del ambiente cuando suena un hotspot
+        crossfadeDurationSec: 1.2, // Duración del crossfade suave entre Lluvia y Barco
+        getTrackKeyForPage(pageNum) {
+            const p = Number(pageNum) || 1;
+            if (p >= 6 && p <= 12) return 'barco';
+            if (p >= 17 && p <= 26) return 'barco';
+            return 'rain'; // 1-5, 13-16, 27-32
+        }
     };
 
     const ReaderAudioManager = (() => {
-        const ambientAudio = new Audio(CHAPTER_AUDIO_CONFIG.backgroundAudioSrc);
-        ambientAudio.loop = true;
-        ambientAudio.preload = 'auto';
+        const ambientPlayers = {};
+        const fadeTokens = {};
 
+        Object.keys(CHAPTER_AUDIO_CONFIG.tracks).forEach((key) => {
+            const audio = new Audio(CHAPTER_AUDIO_CONFIG.tracks[key].src);
+            audio.loop = true;
+            audio.preload = 'auto';
+            audio.volume = 0;
+            ambientPlayers[key] = audio;
+            fadeTokens[key] = 0;
+        });
+
+        let currentTrackKey = 'rain';
         let isDucking = false;
         let masterVolumeRatio = 0.8;
         let isAudioUnlocked = false;
 
         let activeHotspotAudio = null;
         let activeHotspotBtn = null;
+        let activeHotspotSrc = null;
         let hotspotTimeout = null;
 
-        function getTargetAmbientVolume() {
+        function getTargetAmbientVolume(trackKey = currentTrackKey) {
             if (masterVolumeRatio <= 0) return 0;
-            const base = masterVolumeRatio * CHAPTER_AUDIO_CONFIG.ambientAttenuation;
+            const trackCfg = CHAPTER_AUDIO_CONFIG.tracks[trackKey];
+            const attenuation = trackCfg ? trackCfg.attenuation : 0.30;
+            const base = masterVolumeRatio * attenuation;
             return isDucking ? (base * CHAPTER_AUDIO_CONFIG.duckingFactor) : base;
         }
 
-        function fadeAudio(audio, targetVol, durationSec, onComplete) {
+        function getTargetHotspotVolume(btn, soundSrc) {
+            if (masterVolumeRatio <= 0) return 0;
+            const attrVol = btn ? parseFloat(btn.getAttribute('data-volume')) : NaN;
+            const cfgVol = CHAPTER_AUDIO_CONFIG.hotspotVolumes[soundSrc];
+            const individualRatio = !isNaN(attrVol)
+                ? attrVol
+                : (typeof cfgVol === 'number' ? cfgVol : 1.0);
+            return Math.max(0, Math.min(1, masterVolumeRatio * individualRatio));
+        }
+
+        function fadeTrack(trackKey, targetVol, durationSec, onComplete) {
+            const audio = ambientPlayers[trackKey];
             if (!audio) return;
+
+            const token = ++fadeTokens[trackKey];
             const startVol = audio.volume;
             const target = Math.max(0, Math.min(1, targetVol));
             const startTime = performance.now();
             const durationMs = Math.max(50, durationSec * 1000);
 
             function step(now) {
+                if (fadeTokens[trackKey] !== token) return;
                 const elapsed = now - startTime;
                 const progress = Math.min(1, elapsed / durationMs);
                 audio.volume = Math.max(0, Math.min(1, startVol + (target - startVol) * progress));
@@ -141,11 +181,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.removeEventListener('click', unlockAndStartAudio);
             if (visor) visor.removeEventListener('scroll', unlockAndStartAudio);
 
-            ambientAudio.volume = 0;
-            const p = ambientAudio.play();
+            const activeAudio = ambientPlayers[currentTrackKey];
+            if (!activeAudio) return;
+
+            activeAudio.volume = 0;
+            const p = activeAudio.play();
             if (p !== undefined) {
                 p.then(() => {
-                    fadeAudio(ambientAudio, getTargetAmbientVolume(), 1.2);
+                    fadeTrack(currentTrackKey, getTargetAmbientVolume(currentTrackKey), CHAPTER_AUDIO_CONFIG.crossfadeDurationSec);
                 }).catch((err) => {
                     console.warn('[ReaderAudio] Autoplay en espera de interacción:', err);
                     isAudioUnlocked = false;
@@ -155,18 +198,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function setMasterVolume(ratio) {
             masterVolumeRatio = Math.max(0, Math.min(1, Number(ratio) || 0));
-            if (ambientAudio) {
-                ambientAudio.volume = getTargetAmbientVolume();
+            const activeAudio = ambientPlayers[currentTrackKey];
+            if (activeAudio) {
+                fadeTokens[currentTrackKey]++;
+                activeAudio.volume = getTargetAmbientVolume(currentTrackKey);
+                if (isAudioUnlocked && masterVolumeRatio > 0 && activeAudio.paused && !document.hidden) {
+                    activeAudio.play().catch(() => {});
+                }
             }
             if (activeHotspotAudio) {
-                activeHotspotAudio.volume = masterVolumeRatio;
+                activeHotspotAudio.volume = getTargetHotspotVolume(activeHotspotBtn, activeHotspotSrc);
             }
         }
 
         function applyDucking(enable) {
             isDucking = Boolean(enable);
-            if (ambientAudio) {
-                fadeAudio(ambientAudio, getTargetAmbientVolume(), 0.35);
+            if (isAudioUnlocked && ambientPlayers[currentTrackKey]) {
+                fadeTrack(currentTrackKey, getTargetAmbientVolume(currentTrackKey), 0.35);
             }
         }
 
@@ -181,9 +229,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (activeHotspotBtn) {
                 activeHotspotBtn.classList.remove('is-playing');
                 activeHotspotBtn.setAttribute('aria-pressed', 'false');
-                activeHotspotBtn.setAttribute('aria-label', 'Reproducir efecto sonoro de alarma');
+                const defaultLabel = activeHotspotBtn.dataset.defaultLabel || 'Reproducir efecto sonoro';
+                activeHotspotBtn.setAttribute('aria-label', defaultLabel);
                 activeHotspotBtn = null;
             }
+            activeHotspotSrc = null;
             if (hotspotTimeout) {
                 clearTimeout(hotspotTimeout);
                 hotspotTimeout = null;
@@ -193,6 +243,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function toggleHotspotSound(btn, soundSrc) {
             if (!soundSrc) return;
+
+            if (btn && !btn.dataset.defaultLabel) {
+                btn.dataset.defaultLabel = btn.getAttribute('aria-label') || 'Reproducir efecto sonoro';
+            }
 
             // Si el botón ya está reproduciéndose, detenerlo inmediatamente
             if (activeHotspotBtn === btn && activeHotspotAudio) {
@@ -205,17 +259,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             unlockAndStartAudio();
 
-            // Asegurar codificación limpia de la ruta del archivo (ej. alarm call.wav)
+            // Asegurar codificación limpia de la ruta del archivo (ej. alarm call.wav o Canica.WAV)
             const safeSrc = encodeURI(soundSrc).replace(/%2520/g, '%20');
             const sfx = new Audio(safeSrc);
-            sfx.volume = masterVolumeRatio;
+            sfx.volume = getTargetHotspotVolume(btn, soundSrc);
 
             activeHotspotAudio = sfx;
             activeHotspotBtn = btn;
+            activeHotspotSrc = soundSrc;
 
             btn.classList.add('is-playing');
             btn.setAttribute('aria-pressed', 'true');
-            btn.setAttribute('aria-label', 'Detener efecto sonoro de alarma');
+            const stopLabel = (btn.dataset.defaultLabel || 'Reproducir efecto sonoro').replace(/^Reproducir/i, 'Detener');
+            btn.setAttribute('aria-label', stopLabel);
             applyDucking(true);
 
             const cleanup = () => {
@@ -226,8 +282,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             sfx.addEventListener('ended', cleanup, { once: true });
             sfx.addEventListener('error', cleanup, { once: true });
-            // Tiempo límite de seguridad (la alarma dura 6s, margen a 8s)
-            hotspotTimeout = setTimeout(cleanup, 8000);
+            // Tiempo límite de seguridad
+            hotspotTimeout = setTimeout(cleanup, 12000);
 
             const p = sfx.play();
             if (p !== undefined) {
@@ -237,18 +293,55 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
-        function onPageChanged() {
-            // La lluvia ambiental permanece siempre activa en todo el capítulo
+        function onPageChanged(pageNum) {
+            const nextTrackKey = CHAPTER_AUDIO_CONFIG.getTrackKeyForPage(pageNum);
+            if (nextTrackKey === currentTrackKey) return;
+
+            const prevTrackKey = currentTrackKey;
+            currentTrackKey = nextTrackKey;
+
+            if (!isAudioUnlocked) return;
+
+            const outgoingAudio = ambientPlayers[prevTrackKey];
+            const incomingAudio = ambientPlayers[nextTrackKey];
+            const fadeSec = CHAPTER_AUDIO_CONFIG.crossfadeDurationSec;
+
+            if (outgoingAudio && !outgoingAudio.paused) {
+                fadeTrack(prevTrackKey, 0, fadeSec, () => {
+                    if (currentTrackKey !== prevTrackKey) {
+                        outgoingAudio.pause();
+                    }
+                });
+            }
+
+            if (incomingAudio) {
+                if (incomingAudio.paused) {
+                    incomingAudio.volume = 0;
+                    const p = incomingAudio.play();
+                    if (p !== undefined) {
+                        p.then(() => {
+                            fadeTrack(nextTrackKey, getTargetAmbientVolume(nextTrackKey), fadeSec);
+                        }).catch(() => {});
+                    }
+                } else {
+                    fadeTrack(nextTrackKey, getTargetAmbientVolume(nextTrackKey), fadeSec);
+                }
+            }
         }
 
         function pauseAll() {
-            if (ambientAudio) ambientAudio.pause();
+            Object.keys(ambientPlayers).forEach((key) => {
+                fadeTokens[key]++;
+                ambientPlayers[key].pause();
+            });
             stopHotspotSound();
         }
 
         function resumeAmbient() {
-            if (isAudioUnlocked && ambientAudio && ambientAudio.paused && masterVolumeRatio > 0) {
-                ambientAudio.play().catch(() => {});
+            const activeAudio = ambientPlayers[currentTrackKey];
+            if (isAudioUnlocked && activeAudio && activeAudio.paused && masterVolumeRatio > 0) {
+                activeAudio.volume = getTargetAmbientVolume(currentTrackKey);
+                activeAudio.play().catch(() => {});
             }
         }
 
@@ -369,8 +462,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnChapters = document.getElementById('btn-reader-chapters');
     const chaptersPopover = document.getElementById('chapters-popover');
     const chaptersToast = document.getElementById('chapters-unavailable-toast');
-
-    const btnMore = document.getElementById('btn-reader-more');
 
     let currentVolume = 80;
     let lastNonZeroVolume = 80;
@@ -581,15 +672,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 }
             });
-        });
-    }
-
-    // --- 3.3. Botón de 3 Puntos ---
-    if (btnMore) {
-        btnMore.addEventListener('click', (e) => {
-            e.stopPropagation();
-            closeAllPopovers();
-            if (window.Motion) window.Motion.popReaderControl(btnMore);
         });
     }
 
