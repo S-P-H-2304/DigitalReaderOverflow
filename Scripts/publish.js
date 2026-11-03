@@ -15,7 +15,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Media attachment references
     const btnAttachImage = document.getElementById('btn-attach-image');
     const fileInput = document.getElementById('post-file-input');
-    const btnAttachGif = document.getElementById('btn-attach-gif');
     const mediaPreviewContainer = document.getElementById('publish-media-preview-container');
     const mediaPreviewImg = document.getElementById('publish-media-preview-img');
     const btnRemoveMedia = document.getElementById('btn-remove-media');
@@ -28,7 +27,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const commentInput = document.getElementById('comment-input');
     const btnSendComment = document.getElementById('btn-send-comment');
 
-    let currentAttachedMedia = null; // { type: 'image' | 'gif', url: string }
+    let currentAttachedMedia = null; // { type: 'image', url: string }
     let activeCommentPostId = null;
 
     // Verificar sesión con Google y cargar avatar del usuario activo en el overlay
@@ -386,16 +385,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 alert('No se pudo cargar la imagen: ' + err.message);
             }
             fileInput.value = '';
-        });
-    }
-
-    // Manejo de adjuntar GIF
-    if (btnAttachGif) {
-        btnAttachGif.addEventListener('click', () => {
-            const gifUrl = prompt('Ingresa la URL del GIF (o presiona aceptar para usar uno de demostración):', 'https://media.giphy.com/media/3o7TKTDnUxE0vcV20M/giphy.gif');
-            if (gifUrl && gifUrl.trim()) {
-                setMediaAttachment('gif', gifUrl.trim());
-            }
         });
     }
 

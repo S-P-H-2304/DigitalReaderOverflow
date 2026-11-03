@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const ch = chapters['chapter_1'];
                 const uid = await window.DB.getCurrentUserId();
                 const hasLiked = Array.isArray(ch.likes) && ch.likes.includes(uid);
-                applyChapterLikeState(ch.likesCount ?? 1200, hasLiked);
+                applyChapterLikeState(ch.likesCount ?? 0, hasLiked);
             }
         });
     }
@@ -438,7 +438,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             } else {
                 const nextLiked = !likeBtn.classList.contains('active-like');
-                const currentVal = parseInt(likesCountEl ? likesCountEl.textContent : '1200', 10) || 1200;
+                const currentVal = parseInt(likesCountEl ? likesCountEl.textContent : '0', 10) || 0;
                 applyChapterLikeState(nextLiked ? currentVal + 1 : Math.max(0, currentVal - 1), nextLiked);
             }
 

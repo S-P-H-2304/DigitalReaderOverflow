@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- 1. REFERENCIAS DE ELEMENTOS Y UID DINÁMICO ---
     const urlParams = new URLSearchParams(window.location.search);
-    const TARGET_USER_ID = urlParams.get('uid') || 'user_other';
+    const TARGET_USER_ID = urlParams.get('uid') || '';
     const otherAvatar = document.getElementById('other-avatar');
     const otherBanner = document.getElementById('other-banner');
     const otherUsername = document.getElementById('other-username');

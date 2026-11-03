@@ -842,11 +842,6 @@ a {
     height: clamp(1.25rem, 4.6vw, 1.5rem);
 }
 
-#cta-icon-gif {
-    width: clamp(2.35rem, 8.5vw, 2.8rem);
-    height: clamp(1.05rem, 3.8vw, 1.25rem);
-}
-
 .community-card-cta-icon-container {
     display: flex;
     align-items: center;

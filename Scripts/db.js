@@ -26,9 +26,45 @@
 
     const DEFAULT_AVATAR = 'Images/default-avatar.svg';
     const DEFAULT_BANNER = 'Images/default-banner.svg';
-    const DEFAULT_CURRENT_USER_ID = 'user_mclovin';
+    const DEFAULT_CURRENT_USER_ID = '';
     const TOTAL_CHAPTER_1_PANELS = 32;
     const USERNAME_REGEX = /^[a-zA-Z0-9_.]{3,20}$/;
+    const DB_RESET_EPOCH = 1793682000000;
+    const DB_RESET_VERSION_KEY = 'overflow_db_reset_version';
+    const DB_RESET_VERSION_VAL = 'v2026_11_03_clean';
+    const LEGACY_TEST_USER_IDS = new Set(['user_mclovin', 'user_other']);
+    const LEGACY_TEST_USERNAMES = new Set(['lector_overflow', 'maclovinsito_123', 'usuario 1']);
+
+    function isLegacyTestUser(uid, username = '') {
+        if (uid && LEGACY_TEST_USER_IDS.has(String(uid))) return true;
+        if (username && LEGACY_TEST_USERNAMES.has(String(username).trim().toLowerCase())) return true;
+        return false;
+    }
+
+    function isLegacyPost(post) {
+        if (!post || !post.id) return true;
+        if (isLegacyTestUser(post.authorId, post.authorUsername)) return true;
+        if (typeof post.createdAt !== 'number' || post.createdAt < DB_RESET_EPOCH) return true;
+        return false;
+    }
+
+    function normalizeUserAfterReset(user) {
+        if (!user || !user.id || isLegacyTestUser(user.id, user.username)) return false;
+        const cp = user.chapterProgress;
+        const alreadyReset = Boolean(cp && typeof cp === 'object' && cp._resetEpoch === DB_RESET_EPOCH);
+        if (!alreadyReset) {
+            user.chapterProgress = {
+                chapter_1: 0,
+                _resetEpoch: DB_RESET_EPOCH
+            };
+            user.reposts = [];
+            user.following = [];
+            user.followersCount = 0;
+            user.followingCount = 0;
+            return true;
+        }
+        return false;
+    }
 
     function getChapterPanelCount(chapter) {
         return Math.max(
@@ -58,102 +94,16 @@
         'chapter_1': {
             id: 'chapter_1',
             title: 'Capítulo 1: A la deriva',
-            likes: ['user_other'],
-            likesCount: 1200,
-            viewsCount: 2700,
+            likes: [],
+            likesCount: 0,
+            viewsCount: 0,
             totalPanels: TOTAL_CHAPTER_1_PANELS
         }
     };
 
-    const SEED_USERS = {
-        'user_mclovin': {
-            id: 'user_mclovin',
-            username: 'Lector_Overflow',
-            nombres: 'Alex',
-            apellidos: 'Vega',
-            email: 'alex@overflow.com',
-            password: '••••••••',
-            authProvider: 'password',
-            usernameConfirmed: true,
-            bio: 'Lector veterano del cómic Overflow y explorador de capítulos.',
-            avatar: DEFAULT_AVATAR,
-            banner: DEFAULT_BANNER,
-            customAvatar: false,
-            customBanner: false,
-            activeChapter: '1',
-            notificationsEnabled: true,
-            volume: 80,
-            followersCount: 322,
-            followingCount: 540,
-            following: [],
-            reposts: [],
-            chapterProgress: { chapter_1: 0 }
-        },
-        'user_other': {
-            id: 'user_other',
-            username: 'Usuario 1',
-            nombres: 'Carlos',
-            apellidos: 'Lector',
-            email: 'carlos@overflow.com',
-            password: '••••••••',
-            authProvider: 'password',
-            usernameConfirmed: true,
-            bio: 'Fanático del cómic Overflow y coleccionista de viñetas.',
-            avatar: DEFAULT_AVATAR,
-            banner: DEFAULT_BANNER,
-            customAvatar: false,
-            customBanner: false,
-            activeChapter: '1',
-            notificationsEnabled: false,
-            volume: 80,
-            followersCount: 120,
-            followingCount: 85,
-            following: [],
-            reposts: [],
-            chapterProgress: { chapter_1: 12 }
-        }
-    };
+    const SEED_USERS = {};
 
-    const SEED_POSTS = [
-        {
-            id: 'post_1001',
-            authorId: 'user_other',
-            authorUsername: 'Usuario 1',
-            authorAvatar: DEFAULT_AVATAR,
-            createdAt: Date.now() - (10 * 60 * 60 * 1000),
-            content: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, quod. Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, quod.',
-            media: null,
-            likes: ['user_other'],
-            dislikes: [],
-            reposts: [],
-            comments: [
-                {
-                    id: 'c_1',
-                    authorId: 'user_mclovin',
-                    authorUsername: 'Lector_Overflow',
-                    authorAvatar: DEFAULT_AVATAR,
-                    text: '¡Totalmente de acuerdo con esta teoría del capítulo!',
-                    createdAt: Date.now() - (8 * 60 * 60 * 1000)
-                }
-            ]
-        },
-        {
-            id: 'post_1002',
-            authorId: 'user_mclovin',
-            authorUsername: 'Lector_Overflow',
-            authorAvatar: DEFAULT_AVATAR,
-            createdAt: Date.now() - (2 * 60 * 60 * 1000),
-            content: '¡Acabo de releer el Capítulo 1: A la deriva! El cambio de paleta es brutal. ¿Qué esperan del próximo capítulo?',
-            media: {
-                type: 'image',
-                url: 'Images/portada1.jpg'
-            },
-            likes: ['user_other'],
-            dislikes: [],
-            reposts: ['user_other'],
-            comments: []
-        }
-    ];
+    const SEED_POSTS = [];
 
     function getStoredJSON(key, defaultVal) {
         try {
@@ -177,14 +127,26 @@
         return url.includes('googleusercontent.com') || url.includes('lh3.google.com');
     }
 
-    // Limpia cualquier referencia antigua a Maclovin o fotos por defecto de Google no personalizadas
+    // Limpia cualquier referencia antigua a Maclovin, cuentas de prueba o posts previos al reinicio
     function sanitizeLegacyPlaceholders() {
+        const currentUid = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
+        if (currentUid && isLegacyTestUser(currentUid)) {
+            localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+        }
+
         const users = getStoredJSON(STORAGE_KEYS.USERS, null);
         if (users) {
             let modified = false;
             Object.keys(users).forEach(uid => {
                 const u = users[uid];
-                if (!u) return;
+                if (!u || isLegacyTestUser(uid, u.username)) {
+                    delete users[uid];
+                    modified = true;
+                    return;
+                }
+                if (normalizeUserAfterReset(u)) {
+                    modified = true;
+                }
                 if (
                     !u.avatar ||
                     u.avatar === 'Images/Maclovin.png' ||
@@ -204,7 +166,14 @@
         const posts = getStoredJSON(STORAGE_KEYS.POSTS, null);
         if (Array.isArray(posts)) {
             let modified = false;
-            posts.forEach(p => {
+            const cleanPosts = posts.filter(p => {
+                if (isLegacyPost(p)) {
+                    modified = true;
+                    return false;
+                }
+                return true;
+            });
+            cleanPosts.forEach(p => {
                 if (!p.authorAvatar || p.authorAvatar === 'Images/Maclovin.png' || isGoogleDefaultPhotoUrl(p.authorAvatar)) {
                     const authorUser = users && users[p.authorId];
                     p.authorAvatar = (authorUser && authorUser.customAvatar && authorUser.avatar) ? authorUser.avatar : DEFAULT_AVATAR;
@@ -220,7 +189,7 @@
                     });
                 }
             });
-            if (modified) setStoredJSON(STORAGE_KEYS.POSTS, posts);
+            if (modified) setStoredJSON(STORAGE_KEYS.POSTS, cleanPosts);
         }
     }
 
@@ -233,6 +202,17 @@
         localStorage.setItem(STORAGE_KEYS.ACTIVE_CHAPTER, activeCh);
         localStorage.setItem('activeChapter', activeCh);
         document.documentElement.setAttribute('data-chapter', activeCh);
+
+        // Reinicio automático único de caché local en todos los dispositivos
+        if (localStorage.getItem(DB_RESET_VERSION_KEY) !== DB_RESET_VERSION_VAL) {
+            localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify([]));
+            localStorage.setItem(STORAGE_KEYS.CHAPTERS, JSON.stringify(SEED_CHAPTERS));
+            try {
+                sessionStorage.removeItem('overflow_viewed_chapter_1');
+            } catch (e) {}
+            localStorage.setItem(DB_RESET_VERSION_KEY, DB_RESET_VERSION_VAL);
+        }
+
         if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
             localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(SEED_USERS));
         }
@@ -251,7 +231,8 @@
     initLocalCache();
 
     function cacheUserProfileLocally(profile) {
-        if (!profile || !profile.id) return;
+        if (!profile || !profile.id || isLegacyTestUser(profile.id, profile.username)) return;
+        normalizeUserAfterReset(profile);
         if (
             !profile.avatar ||
             profile.avatar === 'Images/Maclovin.png' ||
@@ -356,9 +337,9 @@
         const chapters = getStoredJSON(STORAGE_KEYS.CHAPTERS, SEED_CHAPTERS);
         const ch = chapters['chapter_1'] || SEED_CHAPTERS['chapter_1'];
         const activeUid = cachedUid || DEFAULT_CURRENT_USER_ID;
-        const hasLiked = Array.isArray(ch.likes) && ch.likes.includes(activeUid);
-        const likesCount = typeof ch.likesCount === 'number' ? ch.likesCount : 1200;
-        const viewsCount = typeof ch.viewsCount === 'number' ? ch.viewsCount : 2700;
+        const hasLiked = Boolean(activeUid && Array.isArray(ch.likes) && ch.likes.includes(activeUid));
+        const likesCount = typeof ch.likesCount === 'number' ? ch.likesCount : 0;
+        const viewsCount = typeof ch.viewsCount === 'number' ? ch.viewsCount : 0;
         const totalPanels = getChapterPanelCount(ch);
 
         // En chapterReader.html
@@ -391,7 +372,7 @@
         const cachedUid = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
         const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
 
-        if (cachedUid && users[cachedUid]) {
+        if (cachedUid && users[cachedUid] && !isLegacyTestUser(cachedUid, users[cachedUid].username)) {
             applyProfileToDOMSynchronously(users[cachedUid]);
         }
 
@@ -399,8 +380,8 @@
         const otherAvatar = document.getElementById('other-avatar');
         if (otherAvatar) {
             const urlParams = new URLSearchParams(window.location.search);
-            const targetUid = urlParams.get('uid') || 'user_other';
-            const targetUser = users[targetUid];
+            const targetUid = urlParams.get('uid') || '';
+            const targetUser = (targetUid && !isLegacyTestUser(targetUid)) ? users[targetUid] : null;
             if (targetUser) {
                 otherAvatar.referrerPolicy = 'no-referrer';
                 otherAvatar.src = targetUser.avatar || DEFAULT_AVATAR;
@@ -471,23 +452,36 @@
                         } else {
                             // Respetar sesiones activas iniciadas con Usuario y Contraseña (sin Google)
                             const cachedUid = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
-                            const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
-                            const cachedUser = cachedUid ? users[cachedUid] : null;
-                            const isCustomPasswordSession = Boolean(
-                                cachedUser && (cachedUser.authProvider === 'password' || String(cachedUid).startsWith('user_'))
-                            );
-
-                            if (!isCustomPasswordSession && sessionStorage.getItem('overflow_demo_mode') !== 'true') {
+                            if (cachedUid && isLegacyTestUser(cachedUid)) {
                                 localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
-                            } else if (isCustomPasswordSession && fbDb && fsModRef) {
-                                // Sincronizar perfil propio desde Firestore en segundo plano
-                                fsModRef.getDoc(fsModRef.doc(fbDb, 'users', cachedUid)).then(snap => {
-                                    if (snap.exists()) {
-                                        const cloudData = snap.data();
-                                        cacheUserProfileLocally(cloudData);
-                                        applyProfileToDOMSynchronously(cloudData);
-                                    }
-                                }).catch(() => {});
+                            } else {
+                                const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
+                                const cachedUser = cachedUid ? users[cachedUid] : null;
+                                const isCustomPasswordSession = Boolean(
+                                    cachedUser && (cachedUser.authProvider === 'password' || String(cachedUid).startsWith('user_'))
+                                );
+
+                                if (!isCustomPasswordSession && sessionStorage.getItem('overflow_demo_mode') !== 'true') {
+                                    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+                                } else if (isCustomPasswordSession && fbDb && fsModRef) {
+                                    // Sincronizar perfil propio desde Firestore en segundo plano
+                                    fsModRef.getDoc(fsModRef.doc(fbDb, 'users', cachedUid)).then(snap => {
+                                        if (snap.exists()) {
+                                            const cloudData = snap.data();
+                                            if (normalizeUserAfterReset(cloudData)) {
+                                                fsModRef.setDoc(fsModRef.doc(fbDb, 'users', cachedUid), {
+                                                    chapterProgress: cloudData.chapterProgress,
+                                                    reposts: cloudData.reposts,
+                                                    following: cloudData.following,
+                                                    followersCount: cloudData.followersCount,
+                                                    followingCount: cloudData.followingCount
+                                                }, { merge: true }).catch(() => {});
+                                            }
+                                            cacheUserProfileLocally(cloudData);
+                                            applyProfileToDOMSynchronously(cloudData);
+                                        }
+                                    }).catch(() => {});
+                                }
                             }
                         }
                         if (firstCheck) {
@@ -552,6 +546,7 @@
                 const cloudPosts = [];
                 snap.forEach(docSnap => {
                     const p = docSnap.data();
+                    if (isLegacyPost(p)) return;
                     if (!p.authorAvatar || p.authorAvatar === 'Images/Maclovin.png' || isGoogleDefaultPhotoUrl(p.authorAvatar)) {
                         const u = users[p.authorId];
                         p.authorAvatar = (u && u.customAvatar && u.avatar) ? u.avatar : DEFAULT_AVATAR;
@@ -567,13 +562,11 @@
                     cloudPosts.push(p);
                 });
                 cloudPosts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-                if (cloudPosts.length > 0) {
-                    const prevRaw = localStorage.getItem(STORAGE_KEYS.POSTS);
-                    const nextRaw = JSON.stringify(cloudPosts);
-                    if (prevRaw !== nextRaw) {
-                        localStorage.setItem(STORAGE_KEYS.POSTS, nextRaw);
-                        window.dispatchEvent(new CustomEvent('overflow:posts-synced', { detail: cloudPosts }));
-                    }
+                const prevRaw = localStorage.getItem(STORAGE_KEYS.POSTS);
+                const nextRaw = JSON.stringify(cloudPosts);
+                if (prevRaw !== nextRaw) {
+                    localStorage.setItem(STORAGE_KEYS.POSTS, nextRaw);
+                    window.dispatchEvent(new CustomEvent('overflow:posts-synced', { detail: cloudPosts }));
                 }
             }, () => {});
         } catch (e) {}
@@ -588,6 +581,7 @@
             const cloudPosts = [];
             snap.forEach(docSnap => {
                 const p = docSnap.data();
+                if (isLegacyPost(p)) return;
                 if (!p.authorAvatar || p.authorAvatar === 'Images/Maclovin.png' || isGoogleDefaultPhotoUrl(p.authorAvatar)) {
                     const u = users[p.authorId];
                     p.authorAvatar = (u && u.customAvatar && u.avatar) ? u.avatar : DEFAULT_AVATAR;
@@ -604,13 +598,11 @@
             });
             cloudPosts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-            if (cloudPosts.length > 0) {
-                const prevRaw = localStorage.getItem(STORAGE_KEYS.POSTS);
-                const nextRaw = JSON.stringify(cloudPosts);
-                if (prevRaw !== nextRaw) {
-                    localStorage.setItem(STORAGE_KEYS.POSTS, nextRaw);
-                    window.dispatchEvent(new CustomEvent('overflow:posts-synced', { detail: cloudPosts }));
-                }
+            const prevRaw = localStorage.getItem(STORAGE_KEYS.POSTS);
+            const nextRaw = JSON.stringify(cloudPosts);
+            if (prevRaw !== nextRaw) {
+                localStorage.setItem(STORAGE_KEYS.POSTS, nextRaw);
+                window.dispatchEvent(new CustomEvent('overflow:posts-synced', { detail: cloudPosts }));
             }
             return cloudPosts;
         } catch (e) {
@@ -661,6 +653,16 @@
             let needsUpdate = false;
             const updates = {};
 
+            // Reinicio automático único de actividad previa al corte DB_RESET_EPOCH
+            if (normalizeUserAfterReset(data)) {
+                updates.chapterProgress = data.chapterProgress;
+                updates.reposts = data.reposts;
+                updates.following = data.following;
+                updates.followersCount = data.followersCount;
+                updates.followingCount = data.followingCount;
+                needsUpdate = true;
+            }
+
             // Regla estricta: Nunca usar la imagen de Google como avatar por defecto; usar siempre el placeholder a menos que haya subido una foto propia (customAvatar)
             if (
                 !data.avatar ||
@@ -710,6 +712,17 @@
                 await fsModRef.setDoc(userRef, updates, { merge: true });
             }
 
+            // Limpiar de Firestore cualquier post previo al reinicio cuyo autor sea el usuario autenticado
+            try {
+                const postsSnap = await fsModRef.getDocs(fsModRef.collection(fbDb, 'posts'));
+                postsSnap.forEach(pDoc => {
+                    const pData = pDoc.data();
+                    if (pData && pData.authorId === authUser.uid && isLegacyPost(pData)) {
+                        fsModRef.deleteDoc(fsModRef.doc(fbDb, 'posts', pDoc.id)).catch(() => {});
+                    }
+                });
+            } catch (e) {}
+
             if (typeof data.volume === 'number') {
                 localStorage.setItem(STORAGE_KEYS.VOLUME_PREF, String(Math.round(data.volume)));
             } else {
@@ -756,7 +769,10 @@
             followingCount: 0,
             following: [],
             reposts: [],
-            chapterProgress: { chapter_1: 0 },
+            chapterProgress: {
+                chapter_1: 0,
+                _resetEpoch: DB_RESET_EPOCH
+            },
             createdAt: Date.now()
         };
 
@@ -768,32 +784,6 @@
     async function ensureSeedDataInFirestore() {
         if (!fbDb || !fsModRef) return;
 
-        for (const seedId of Object.keys(SEED_USERS)) {
-            const uRef = fsModRef.doc(fbDb, 'users', seedId);
-            const uSnap = await fsModRef.getDoc(uRef);
-            if (!uSnap.exists()) {
-                await fsModRef.setDoc(uRef, SEED_USERS[seedId]);
-            }
-            const sUser = SEED_USERS[seedId];
-            if (sUser && sUser.username) {
-                const uKeyRef = fsModRef.doc(fbDb, 'usernames', sUser.username.trim().toLowerCase());
-                const uKeySnap = await fsModRef.getDoc(uKeyRef);
-                if (!uKeySnap.exists()) {
-                    await fsModRef.setDoc(uKeyRef, { uid: seedId, createdAt: Date.now() });
-                }
-            }
-        }
-
-        const postsCol = fsModRef.collection(fbDb, 'posts');
-        const q = fsModRef.query(postsCol, fsModRef.limit(1));
-        const snap = await fsModRef.getDocs(q);
-        if (snap.empty) {
-            for (const post of SEED_POSTS) {
-                const pRef = fsModRef.doc(fbDb, 'posts', post.id);
-                await fsModRef.setDoc(pRef, post);
-            }
-        }
-
         for (const chId of Object.keys(SEED_CHAPTERS)) {
             const cRef = fsModRef.doc(fbDb, 'chapters', chId);
             const cSnap = await fsModRef.getDoc(cRef);
@@ -803,7 +793,7 @@
                 const cData = cSnap.data();
                 if (typeof cData.viewsCount !== 'number' || typeof cData.totalPanels !== 'number' || cData.totalPanels < TOTAL_CHAPTER_1_PANELS) {
                     await fsModRef.setDoc(cRef, {
-                        viewsCount: typeof cData.viewsCount === 'number' ? cData.viewsCount : 2700,
+                        viewsCount: typeof cData.viewsCount === 'number' ? cData.viewsCount : 0,
                         totalPanels: Math.max(typeof cData.totalPanels === 'number' ? cData.totalPanels : 0, TOTAL_CHAPTER_1_PANELS)
                     }, { merge: true });
                 }
@@ -1224,6 +1214,7 @@
                     const usersSnap = await fsModRef.getDocs(usersCol);
                     for (const docSnap of usersSnap.docs) {
                         const uData = docSnap.data();
+                        if (isLegacyTestUser(docSnap.id, uData && uData.username)) continue;
                         if (uData && uData.username && uData.username.toLowerCase() === lowerKey) {
                             if (!excludeUid || docSnap.id !== excludeUid) {
                                 return {
@@ -1300,7 +1291,7 @@
                 followingCount: 0,
                 following: [],
                 reposts: [],
-                chapterProgress: { chapter_1: 0 },
+                chapterProgress: { chapter_1: 0, _resetEpoch: DB_RESET_EPOCH },
                 createdAt: Date.now()
             };
 
@@ -1335,10 +1326,11 @@
                     const snap = await fsModRef.getDocs(fsModRef.collection(fbDb, 'users'));
                     snap.forEach(docSnap => {
                         const u = docSnap.data();
-                        if (u && u.id) {
+                        if (u && u.id && !isLegacyTestUser(u.id, u.username)) {
                             if (!u.customAvatar && isGoogleDefaultPhotoUrl(u.avatar)) {
                                 u.avatar = DEFAULT_AVATAR;
                             }
+                            normalizeUserAfterReset(u);
                             users[u.id] = u;
                         }
                     });
@@ -1506,8 +1498,8 @@
                 id: chapterId,
                 title: 'Capítulo 1: A la deriva',
                 likes: [],
-                likesCount: 1200,
-                viewsCount: 2700,
+                likesCount: 0,
+                viewsCount: 0,
                 totalPanels: TOTAL_CHAPTER_1_PANELS
             };
 
@@ -1522,14 +1514,14 @@
                 ? Math.min(totalPanels, Math.max(0, activeUser.chapterProgress[chapterId]))
                 : 0;
 
-            const hasLiked = Array.isArray(ch.likes) && ch.likes.includes(currentUserId);
+            const hasLiked = Boolean(currentUserId) && Array.isArray(ch.likes) && ch.likes.includes(currentUserId);
 
             initFirebase().then(() => syncChaptersFromFirestoreInBackground());
 
             return {
                 id: ch.id,
-                likesCount: typeof ch.likesCount === 'number' ? ch.likesCount : 1200,
-                viewsCount: typeof ch.viewsCount === 'number' ? ch.viewsCount : 2700,
+                likesCount: typeof ch.likesCount === 'number' ? ch.likesCount : 0,
+                viewsCount: typeof ch.viewsCount === 'number' ? ch.viewsCount : 0,
                 totalPanels,
                 panelsRead,
                 hasLiked,
@@ -1549,7 +1541,7 @@
                 chapters[chapterId] = { ...SEED_CHAPTERS[chapterId] };
             }
             const ch = chapters[chapterId];
-            ch.viewsCount = (typeof ch.viewsCount === 'number' ? ch.viewsCount : 2700) + 1;
+            ch.viewsCount = (typeof ch.viewsCount === 'number' ? ch.viewsCount : 0) + 1;
             setStoredJSON(STORAGE_KEYS.CHAPTERS, chapters);
 
             initFirebase().then(async () => {
@@ -1559,7 +1551,7 @@
                             id: ch.id || chapterId,
                             title: ch.title || 'Capítulo 1: A la deriva',
                             likes: Array.isArray(ch.likes) ? ch.likes : [],
-                            likesCount: typeof ch.likesCount === 'number' ? ch.likesCount : 1200,
+                            likesCount: typeof ch.likesCount === 'number' ? ch.likesCount : 0,
                             viewsCount: ch.viewsCount,
                             totalPanels: getChapterPanelCount(ch)
                         }, { merge: true });
@@ -1572,13 +1564,16 @@
 
         async saveChapterProgress(chapterId = 'chapter_1', panelsRead = 1, totalPanels = TOTAL_CHAPTER_1_PANELS) {
             const currentUserId = await this.getCurrentUserId();
+            if (!currentUserId || isLegacyTestUser(currentUserId)) return 0;
+
             const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
             const user = users[currentUserId];
-            if (!user) return;
+            if (!user) return 0;
 
             if (!user.chapterProgress || typeof user.chapterProgress !== 'object') {
-                user.chapterProgress = {};
+                user.chapterProgress = { _resetEpoch: DB_RESET_EPOCH };
             }
+            user.chapterProgress._resetEpoch = DB_RESET_EPOCH;
 
             const prevProgress = user.chapterProgress[chapterId] || 0;
             const nextProgress = Math.min(totalPanels, Math.max(prevProgress, Math.round(panelsRead)));
@@ -1605,6 +1600,10 @@
 
         async toggleChapterLike(chapterId = 'chapter_1') {
             const currentUserId = await this.getCurrentUserId();
+            if (!currentUserId || isLegacyTestUser(currentUserId)) {
+                return { likesCount: 0, hasLiked: false };
+            }
+
             const chapters = getStoredJSON(STORAGE_KEYS.CHAPTERS, SEED_CHAPTERS);
             if (!chapters[chapterId]) {
                 chapters[chapterId] = {
@@ -1612,8 +1611,8 @@
                         id: chapterId,
                         title: 'Capítulo 1: A la deriva',
                         likes: [],
-                        likesCount: 1200,
-                        viewsCount: 2700,
+                        likesCount: 0,
+                        viewsCount: 0,
                         totalPanels: TOTAL_CHAPTER_1_PANELS
                     })
                 };
@@ -1621,7 +1620,7 @@
 
             const ch = chapters[chapterId];
             if (!Array.isArray(ch.likes)) ch.likes = [];
-            if (typeof ch.likesCount !== 'number') ch.likesCount = 1200;
+            if (typeof ch.likesCount !== 'number') ch.likesCount = 0;
 
             const alreadyLiked = ch.likes.includes(currentUserId);
             if (alreadyLiked) {
@@ -1643,7 +1642,7 @@
                             title: ch.title || 'Capítulo 1: A la deriva',
                             likes: ch.likes,
                             likesCount: ch.likesCount,
-                            viewsCount: typeof ch.viewsCount === 'number' ? ch.viewsCount : 2700,
+                            viewsCount: typeof ch.viewsCount === 'number' ? ch.viewsCount : 0,
                             totalPanels: getChapterPanelCount(ch)
                         }, { merge: true });
                     } catch (e) {
@@ -1663,7 +1662,7 @@
         // ==========================================
         async getCurrentUserId() {
             const cachedUid = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
-            if (cachedUid) return cachedUid;
+            if (cachedUid && !isLegacyTestUser(cachedUid)) return cachedUid;
             await initFirebase();
             if (currentAuthUser) return currentAuthUser.uid;
             return DEFAULT_CURRENT_USER_ID;
@@ -1671,6 +1670,8 @@
 
         async getProfile(userId = null) {
             const targetId = userId || localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || (currentAuthUser && currentAuthUser.uid) || DEFAULT_CURRENT_USER_ID;
+            if (!targetId || isLegacyTestUser(targetId)) return null;
+
             const users = getStoredJSON(STORAGE_KEYS.USERS, SEED_USERS);
 
             if (users[targetId]) {
@@ -1680,9 +1681,11 @@
                             const snap = await fsModRef.getDoc(fsModRef.doc(fbDb, 'users', targetId));
                             if (snap.exists()) {
                                 const cloudData = snap.data();
+                                if (isLegacyTestUser(targetId, cloudData.username)) return;
                                 if (!cloudData.customAvatar && isGoogleDefaultPhotoUrl(cloudData.avatar)) {
                                     cloudData.avatar = DEFAULT_AVATAR;
                                 }
+                                normalizeUserAfterReset(cloudData);
                                 cacheUserProfileLocally(cloudData);
                                 if (targetId === localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID)) {
                                     applyProfileToDOMSynchronously(cloudData);
@@ -1701,9 +1704,11 @@
                     const snap = await fsModRef.getDoc(userRef);
                     if (snap.exists()) {
                         const data = snap.data();
+                        if (isLegacyTestUser(targetId, data.username)) return null;
                         if (!data.customAvatar && isGoogleDefaultPhotoUrl(data.avatar)) {
                             data.avatar = DEFAULT_AVATAR;
                         }
+                        normalizeUserAfterReset(data);
                         cacheUserProfileLocally(data);
                         return data;
                     } else if (currentAuthUser && targetId === currentAuthUser.uid) {
@@ -1714,7 +1719,7 @@
                 }
             }
 
-            return users[targetId] || users[DEFAULT_CURRENT_USER_ID];
+            return users[targetId] || null;
         },
 
         async updateProfile(updates, userId = null) {
@@ -1887,7 +1892,7 @@
         // 3. PUBLICACIONES (0ms CACHE + CLOUD SYNC)
         // ==========================================
         async getPosts(filterAuthorId = null) {
-            const cachedPosts = getStoredJSON(STORAGE_KEYS.POSTS, SEED_POSTS);
+            const cachedPosts = getStoredJSON(STORAGE_KEYS.POSTS, SEED_POSTS).filter(p => !isLegacyPost(p));
             initFirebase().then(() => syncPostsFromFirestoreInBackground());
 
             if (filterAuthorId) {
