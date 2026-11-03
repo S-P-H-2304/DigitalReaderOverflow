@@ -434,11 +434,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 cropperBackdrop.classList.add('active');
                 cropperBackdrop.setAttribute('aria-hidden', 'false');
 
-                // Medir dimensiones reales del viewport una vez visible
+                // Medir dimensiones reales del viewport una vez visible (offsetWidth ignora el scale de animación CSS)
                 requestAnimationFrame(() => {
                     const rect = cropperViewport.getBoundingClientRect();
-                    cropperViewportWidth = rect.width || (target === 'avatar' ? 200 : 280);
-                    cropperViewportHeight = rect.height || (target === 'avatar' ? 200 : 160);
+                    cropperViewportWidth = cropperViewport.offsetWidth || rect.width || (target === 'avatar' ? 200 : 280);
+                    cropperViewportHeight = cropperViewport.offsetHeight || rect.height || (target === 'avatar' ? 200 : 160);
 
                     // Escala mínima requerida para que cubra todo el viewport sin huecos
                     cropperMinScale = Math.max(
@@ -481,6 +481,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (avatarFileInput) avatarFileInput.value = '';
         if (bannerFileInput) bannerFileInput.value = '';
     }
+
+    window.addEventListener('resize', () => {
+        if (!cropperBackdrop || !cropperBackdrop.classList.contains('active') || !cropperViewport || !cropperImgNaturalWidth) return;
+        const newW = cropperViewport.offsetWidth;
+        const newH = cropperViewport.offsetHeight;
+        if (!newW || !newH) return;
+        cropperViewportWidth = newW;
+        cropperViewportHeight = newH;
+        cropperMinScale = Math.max(
+            cropperViewportWidth / cropperImgNaturalWidth,
+            cropperViewportHeight / cropperImgNaturalHeight
+        );
+        cropperMaxScale = Math.max(cropperMinScale * 4, cropperMinScale + 2);
+        if (cropperScale < cropperMinScale) cropperScale = cropperMinScale;
+        updateCropperTransform();
+    });
 
     // GESTOS TÁCTILES MÓVILES (Arrastre 1 dedo + Pellizco 2 dedos)
     if (cropperStage) {

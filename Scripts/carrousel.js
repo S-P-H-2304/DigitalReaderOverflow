@@ -349,16 +349,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 75vw es lo que se usa en CSS (calc(-50% - 75vw)). 72vw era el valor en JS antes.
 
-    // Usaremos el valor que mejor empareje con el CSS.
+    // Usaremos el valor que mejor empareje con el CSS (75vw en móvil, con tope de 340px en pantallas >= 540px).
+    function computeCarouselGapPx() {
+        return window.innerWidth >= 540
+            ? Math.min(window.innerWidth * 0.75, 340)
+            : window.innerWidth * 0.75;
+    }
 
-    let gapPx = window.innerWidth * 0.75; 
-
-
+    let gapPx = computeCarouselGapPx();
 
     window.addEventListener('resize', () => {
-
-        gapPx = window.innerWidth * 0.75;
-
+        gapPx = computeCarouselGapPx();
     });
 
 
